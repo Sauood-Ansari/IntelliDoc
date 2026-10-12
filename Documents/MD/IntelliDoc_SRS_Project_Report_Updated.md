@@ -4,103 +4,58 @@
 
 ## **INDEX**
 
-**Content****	Page No.**
-
-**Chapter 1: INTRODUCTION	1**
-
-1.1 Introduction	1
-
-1.2 Literature Survey	1
-
-1.3 Present State of the Art and Shortcomings	2
-
-1.4 Realization of the Problems	2
-
-1.5 Introduction of the Proposed Work	2
-
-1.6 Broad Outline of the Work	3
-
-**Chapter 2: PROBLEM FORMULATION	4**
-
-2.1 Problem Definition and Detailed Description	4
-
-2.2 Various Aspects of the Problem	4
-
-2.3 Critical View of Present Approaches	5
-
-2.4 Scientific Novelty and Need of the Work	5
-
-2.5 Proposed System / Method of Solution	5
-
-**Chapter 3: SYSTEM ANALYSIS AND DESIGN	7**
-
-3.1 Requirement Specification	7
-
-3.2 Information Collection / Requirements Elicitation	9
-
-3.3 Analysis and Development of the Actual Solution	9
-
-3.4 Description of Various Modules	10
-
-3.5 System Development Tools	11
-
-3.6 Choice of Language	11
-
-3.7 Choice of System for Implementation	12
-
-3.8 System Architecture	12
-
-3.9 Detailed Design Diagrams	13
-
-3.10 Key Algorithms	17
-
-3.11 Use Case Specifications	18
-
-3.12 Database Design and Data Dictionary	19
-
-3.13 Technology Stack Justification	20
-
-3.14 Design Tools and Limitations	20
-
-**Chapter 4: SYSTEM IMPLEMENTATION	22**
-
-4.1 Hardware Requirements	22
-
-4.2 Software Requirements	22
-
-4.3 Input Requirements	22
-
-4.4 Operation Manual	23
-
-4.5 Output Reports / Results	24
-
-4.6 Implementation Status	24
-
-**Chapter 5: RESULT AND DISCUSSION	25**
-
-5.1 Evaluation Framework and Interpretation of Results	25
-
-5.2 Application Areas and Scope of Work	25
-
-5.3 Discussion	25
-
-**Chapter 6: CONCLUSION	27**
-
-6.1 Advantages and Special Features	27
-
-6.2 Limitations	27
-
-6.3 Future Extensions	27
-
-References	30
-
-Appendix A: Configuration Parameters	32
-
-Appendix B: Draft API Specification	33
-
-Appendix C: Scoring Rules	34
-
-Appendix D: Example Analysis Results	35
+| **Content** | **Page No.** |
+| --- | --- |
+| **Chapter 1: INTRODUCTION** | |
+| 1.1 Introduction | 1 |
+| 1.2 Literature Survey | 1 |
+| 1.3 Present State of the Art and Shortcomings | 2 |
+| 1.4 Realization of the Problems | 2 |
+| 1.5 Introduction of the Proposed Work | 2 |
+| 1.6 Broad Outline of the Work | 3 |
+| **Chapter 2: PROBLEM FORMULATION** | |
+| 2.1 Problem Definition and Detailed Description | 4 |
+| 2.2 Various Aspects of the Problem | 4 |
+| 2.3 Critical View of Present Approaches | 5 |
+| 2.4 Scientific Novelty and Need of the Work | 5 |
+| 2.5 Proposed System / Method of Solution | 5 |
+| **Chapter 3: SYSTEM ANALYSIS AND DESIGN** | |
+| 3.1 Requirement Specification | 7 |
+| 3.2 Information Collection / Requirements Elicitation | 9 |
+| 3.3 Analysis and Development of the Actual Solution | 9 |
+| 3.4 Description of Various Modules | 10 |
+| 3.5 System Development Tools | 11 |
+| 3.6 Choice of Language | 11 |
+| 3.7 Choice of System for Implementation | 12 |
+| 3.8 System Architecture | 12 |
+| 3.9 Detailed Design Diagrams | 13 |
+| 3.10 Key Algorithms | 17 |
+| 3.11 Use Case Specifications | 18 |
+| 3.12 Database Design and Data Dictionary | 19 |
+| 3.13 Technology Stack Justification | 20 |
+| 3.14 Design Tools and Limitations | 20 |
+| **Chapter 4: SYSTEM IMPLEMENTATION** | |
+| 4.1 Hardware Requirements | 22 |
+| 4.2 Software Requirements | 22 |
+| 4.3 Input Requirements | 22 |
+| 4.4 Operation Manual | 23 |
+| 4.5 Output Reports / Results | 24 |
+| 4.5.1 User Interface Design and Interactive Workflows | 24 |
+| 4.6 Implementation Status | 24 |
+| **Chapter 5: RESULT AND DISCUSSION** | |
+| 5.1 Evaluation Framework and Interpretation of Results | 25 |
+| 5.2 Application Areas and Scope of Work | 25 |
+| 5.3 Discussion | 25 |
+| **Chapter 6: CONCLUSION** | |
+| 6.1 Advantages and Special Features | 27 |
+| 6.2 Limitations | 27 |
+| 6.3 Future Extensions | 27 |
+| References | 30 |
+| Appendix A: Configuration Parameters | 32 |
+| Appendix B: Draft API Specification | 33 |
+| Appendix C: Scoring Rules | 34 |
+| Appendix D: Example Analysis Results | 35 |
+| Appendix E: System Test Suite and Security Verification | 36 |
 
 ## **LIST OF ABBREVIATIONS**
 
@@ -256,9 +211,9 @@ The following functional requirements expand the project synopsis into a concise
 | NFR-PER-002 | AI calls shall not be invoked automatically for every function during a standard scan. | High |
 | NFR-REL-001 | Deterministic analysis shall remain available when AI services are unavailable. | High |
 | NFR-REL-002 | Parser or API failures shall be handled without crashing the entire application where recovery is possible. | High |
-| NFR-SEC-001 | Protected resources shall require valid JWT authentication and role authorization. | High |
-| NFR-SEC-002 | Secrets such as database and AI credentials shall be stored through environment configuration and not hard-coded. | High |
-| NFR-SEC-003 | Source-code input shall be handled as potentially sensitive information. | High |
+| NFR-SEC-001 | Protected resources shall require valid JWT authentication (short-lived access tokens with refresh tokens) and role authorization. Passwords shall be hashed using bcrypt (cost ≥ 12). | High |
+| NFR-SEC-002 | Secrets such as database and AI credentials shall be stored through environment configuration and not hard-coded. CORS shall be restricted to the frontend origin. | High |
+| NFR-SEC-003 | Source-code input shall be handled as potentially sensitive information: processed in-memory, not persisted beyond scan lifecycle, and AI context truncated to MAX_AI_CONTEXT bytes. Login and AI endpoints shall be rate-limited. | High |
 | NFR-USA-001 | Dashboards shall present understandable findings, metrics, and explanations without requiring tool-specific training. | Medium |
 | NFR-MNT-001 | AI providers shall be accessed through a common abstraction so the provider can be changed without rewriting deterministic analysis. | High |
 | NFR-MNT-002 | The analysis pipeline shall keep parsing, documentation comparison, and scoring logically separated. | High |
@@ -334,6 +289,34 @@ Fig. 3.1: IntelliDoc System Architecture
 
 The architecture follows a layered design. Presentation concerns remain in the frontend, access control and orchestration are handled by FastAPI, analysis modules perform source inspection, and PostgreSQL stores durable records. The AI branch is connected as an optional service from the application/analysis layer. This arrangement reflects the central design rule that deterministic analysis is the baseline service and AI is a secondary capability.
 
+#### **3.9.1 Asynchronous Scan Execution Pattern**
+
+To prevent HTTP gateway timeouts (typically 10–15 seconds on cloud hosting and serverless tiers) when analyzing repositories of 5,000–10,000 lines of code, IntelliDoc decouples scan submission from analysis execution using an asynchronous worker pattern.
+
+**Fig. 3.1b: Asynchronous Scan Processing and Status Polling**
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor P as Programmer (Next.js)
+    participant API as FastAPI Backend
+    participant W as Background Worker
+    participant DB as PostgreSQL
+    P->>API: POST /scans (ZIP Archive / Codebase)
+    API->>DB: INSERT scan (status="Queued")
+    API->>W: Enqueue background analysis
+    API-->>P: 202 Accepted { scan_id, status: "Queued" }
+    rect rgb(240, 248, 255)
+    W->>DB: UPDATE scan status="Running"
+    W->>W: Parse AST -> Detect Drift -> Calculate Score
+    W->>DB: INSERT findings, UPDATE status="Completed"
+    end
+    loop Status Polling / SSE
+        P->>API: GET /scans/{scan_id}
+        API-->>P: 200 OK { status: "Completed", score: 84 }
+    end
+```
+
 ### **3.10 Detailed Design Diagrams**
 
 ![Embedded image or diagram](assets/IntelliDoc_SRS_Project_Report_Updated_image_02.png)
@@ -374,51 +357,178 @@ Fig. 3.9: Class Diagram : IntelliDoc Core Software Model
 
 #### Algorithm 1 : Source File Discovery
 
-Input: codebase directory. Traverse the submitted project, identify Python source files, ignore unsupported file types, and record files that cannot be accessed. Output: list of candidate source files.
+```
+INPUT : codebase_path
+OUTPUT: python_files[], errors[]
+
+1. FOR EACH entry IN walk(codebase_path):
+2.   IF entry is file AND entry.extension == ".py":
+3.     IF accessible(entry): append to python_files
+4.     ELSE: append AccessError to errors
+5.   ELSE: skip
+6. RETURN python_files, errors
+```
 
 #### Algorithm 2 : AST Parsing
 
-Input: Python source file. Read the source, call Python ast parsing, and construct an abstract syntax tree. On syntax failure, record a parse error associated with the file and continue where possible.
+```
+INPUT : source_file
+OUTPUT: ast_tree OR parse_error
+
+1. source ← read(source_file)
+2. TRY:
+3.   ast_tree ← ast.parse(source)
+4.   RETURN ast_tree
+5. CATCH SyntaxError:
+6.   RETURN ParseError(file=source_file, detail=error)
+```
 
 #### Algorithm 3 : Function Extraction
 
-Input: AST. Traverse function and async-function nodes and collect function name, source location, signature, and docstring availability. Nested functions may be represented where supported by the traversal policy.
+```
+INPUT : ast_tree
+OUTPUT: functions[]
+
+1. FOR EACH node IN ast.walk(ast_tree):
+2.   IF node is FunctionDef OR AsyncFunctionDef:
+3.     func ← {
+4.       name: node.name,
+5.       line: node.lineno,
+6.       params: extract_param_names(node.args),
+7.       has_docstring: first_statement_is_string(node)
+8.     }
+9.     append func to functions
+10. RETURN functions
+```
 
 #### Algorithm 4 : Docstring Extraction
 
-Input: function node. Read the node-level docstring, identify supported Google-style sections such as Args and Returns, and normalize names for comparison.
+```
+INPUT : function_node
+OUTPUT: documented_params[], has_returns_section
+
+1. docstring ← ast.get_docstring(function_node)
+2. IF docstring is NULL: RETURN empty, false
+3. sections ← parse_google_style(docstring)
+4. documented_params ← extract_names(sections["Args"])
+5. has_returns ← "Returns" IN sections
+6. RETURN documented_params, has_returns
+```
 
 #### Algorithm 5 : Signature/Documentation Comparison
 
-Input: function signature and normalized documentation. Compare actual parameter names with documented parameter names. Identify missing or obsolete documentation entries and record explanations.
+```
+INPUT : signature_params S = {p₁..pₙ}, documented_params D = {d₁..dₘ}
+OUTPUT: findings[]
+
+1. missing  ← S \ D          // in code but not in docs
+2. obsolete ← D \ S          // in docs but not in code
+3. FOR EACH p IN missing:
+4.   findings.append(Finding(type=MISSING_PARAM_DOC, param=p, severity=MEDIUM))
+5. FOR EACH d IN obsolete:
+6.   findings.append(Finding(type=OBSOLETE_PARAM_DOC, param=d, severity=HIGH))
+7. RETURN findings
+```
 
 #### Algorithm 6 : Drift Detection
 
-Input: normalized comparison result. Apply deterministic rules and assign finding type/severity. Only rules whose evidence is available in source-level information are reported deterministically.
+```
+INPUT : function_metadata, docstring_data
+OUTPUT: findings[]
+
+1. findings ← Algorithm_5(function_metadata.params, docstring_data.params)
+2. IF function_has_return_statement(function_metadata) AND NOT docstring_data.has_returns:
+3.   findings.append(Finding(type=MISSING_RETURN_DOC, severity=LOW))
+4. FOR EACH finding IN findings:
+5.   finding.explanation ← generate_explanation(finding)
+6. RETURN findings
+```
 
 #### Algorithm 7 : Missing Documentation Detection
 
-Input: functions. Mark functions without docstrings as missing-documentation findings. These are kept conceptually distinct from stale documentation findings.
+```
+INPUT : functions[]
+OUTPUT: findings[]
+
+1. FOR EACH func IN functions:
+2.   IF func.has_docstring == false:
+3.     findings.append(Finding(
+4.       type=NO_DOCSTRING, function=func.name, severity=MEDIUM
+5.     ))
+6. RETURN findings
+```
 
 #### Algorithm 8 : AI Documentation Generation
 
-Input: selected undocumented function. Send minimal necessary context through the AI abstraction to the configured Groq model, receive a draft, validate/display it as advisory content, and leave acceptance/rejection to the Programmer.
+```
+INPUT : function_context (name, params, body_summary)
+OUTPUT: draft_docstring OR error
+
+1. IF ai_provider.is_available() == false: RETURN ServiceUnavailableError
+2. prompt ← build_docstring_prompt(function_context)
+3. TRY:
+4.   draft ← ai_provider.generate(prompt, timeout=AI_TIMEOUT)
+5.   RETURN draft    // advisory — Programmer must review
+6. CATCH Timeout/APIError:
+7.   RETURN AdvisoryError(detail=error)  // deterministic scan unaffected
+```
 
 #### Algorithm 9 : AI Logical-Consistency Check
 
-Input: selected function and documentation. Send the relevant context to Gemini through the AI abstraction, display the returned advisory assessment, and store the analysis state. Failure does not invalidate deterministic findings.
+```
+INPUT : function_context, existing_docstring
+OUTPUT: advisory_result OR error
+
+1. IF ai_provider.is_available() == false: RETURN ServiceUnavailableError
+2. prompt ← build_consistency_prompt(function_context, existing_docstring)
+3. TRY:
+4.   result ← ai_provider.check(prompt, timeout=AI_TIMEOUT)
+5.   store(AIAnalysis(status=Completed, result=result))
+6.   RETURN result    // advisory only
+7. CATCH Timeout/APIError:
+8.   store(AIAnalysis(status=Failed))
+9.   RETURN AdvisoryError(detail=error)
+```
 
 #### Algorithm 10 : Score Calculation
 
-Input: scan-level deterministic findings and completeness indicators. Normalize the selected components into a 0 to 100 metric according to the documented scoring policy. Store both the score and component breakdown.
+```
+INPUT : total_functions, documented_functions, findings[]
+OUTPUT: score (0–100), breakdown{}
+
+1. completeness ← 40 × (documented_functions / total_functions)
+2. param_penalty ← SUM(penalty(f) FOR f IN findings IF f.type IN {MISSING_PARAM, OBSOLETE_PARAM})
+3. return_penalty ← SUM(penalty(f) FOR f IN findings IF f.type == MISSING_RETURN)
+4. param_consistency ← MAX(0, 40 − param_penalty)
+5. return_consistency ← MAX(0, 20 − return_penalty)
+6. score ← BOUND(completeness + param_consistency + return_consistency, 0, 100)
+7. RETURN score, {completeness, param_consistency, return_consistency}
+```
 
 #### Algorithm 11 : Team Aggregation
 
-Input: authorized Programmer scores. Aggregate according to a documented rule such as weighted mean by analysed-function count. Preserve access boundaries.
+```
+INPUT : programmer_scores[] (authorized team members only)
+OUTPUT: team_score
+
+1. weighted_sum ← 0, total_weight ← 0
+2. FOR EACH ps IN programmer_scores:
+3.   weight ← ps.analysed_function_count
+4.   weighted_sum += ps.score × weight
+5.   total_weight += weight
+6. team_score ← weighted_sum / total_weight
+7. RETURN team_score
+```
 
 #### Algorithm 12 : Project Aggregation
 
-Input: authorized Team-level aggregates. Combine team metrics to create a project-level view while preserving the separation between detailed programmer records and higher-level summaries.
+```
+INPUT : team_scores[] (authorized teams only)
+OUTPUT: project_score
+
+1. project_score ← MEAN(team_scores)
+2. RETURN project_score
+```
 
 ### **3.12 Use Case Specifications**
 
@@ -465,7 +575,21 @@ Input: authorized Team-level aggregates. Combine team metrics to create a projec
 | Team | team_lead_id | FK | References User |
 | Project | project_lead_id | FK | References User |
 | Codebase | owner_id | FK | References User |
-| Scan | status | varchar | Queued, Running, Completed, Partial, Failed |
+| Scan | status | varchar | Queued, Running, Completed, Partial, Failed (see state diagram below) |
+
+**Fig. 3.10: Scan Status State Transition Diagram**
+
+```mermaid
+stateDiagram-v2
+    [*] --> Queued : Scan initiated
+    Queued --> Running : Worker picks up
+    Running --> Completed : All files processed
+    Running --> Partial : Some files failed parsing
+    Running --> Failed : Critical error
+    Partial --> [*]
+    Completed --> [*]
+    Failed --> [*]
+```
 | Function | name | varchar | Function or method name |
 | Function | line_number | integer | Source location; non-negative |
 | Finding | type | varchar | Supported deterministic finding type |
@@ -628,6 +752,52 @@ The primary system output is a scan result containing a summary of the analysed 
 | Team Metrics | Aggregated authorized programmer metrics. |
 | Project Metrics | Aggregated team/project metrics. |
 
+### **4.5.1 User Interface Design and Interactive Workflows**
+
+To ensure high usability (NFR-USA-001) and rapid triage across organizational roles, IntelliDoc implements role-specialized UI layouts, interactive code inspectors, and accessible visual indicators.
+
+#### **1. Role-Specific Information Architecture**
+
+- **Programmer Workspace (Action & Diff Focus)**: Centers on immediate drift resolution. Displays the overall Documentation Reliability Score (DRS), a filterable findings tray, and the interactive **Docstring Drift Inspector** showing a split-screen diff between the active function signature and the docstring. One-click actions allow the programmer to request an AI draft, copy formatted docstrings, or mark false positives.
+- **Team Lead Dashboard (Triage & Health Oversight)**: Displays the team aggregate DRS gauge, target threshold indicators, distribution charts by finding type (e.g., missing vs. obsolete parameters), and a ranked member overview designed for constructive code-quality mentoring.
+- **Project Lead Portfolio (Cross-Team Benchmarking)**: High-level executive dashboard presenting comparative team performance bar charts, organizational documentation health, and 30-day drift velocity trends.
+
+#### **2. The Docstring Drift Inspector Interface**
+
+```
++-----------------------------------------------------------------------------------------+
+| Function: calculate_tax(amount: float, rate: float, exemption: float = 0.0) -> float   |
+| Location: billing/tax_service.py : Line 45                                              |
++-----------------------------------------------------------------------------------------+
+| CURRENT FUNCTION SIGNATURE             | EXISTING GOOGLE-STYLE DOCSTRING                |
+| - amount: float                        | Args:                                          |
+| - rate: float                          |     amount (float): The base invoice amount.   |
+| - exemption: float                     |     discount (float): Old discount rate. ❌     |
+|                                        |                       [OBSOLETE PARAMETER]      |
+|                                        | ⚠️ MISSING IN DOCS: rate, exemption             |
++-----------------------------------------------------------------------------------------+
+| [✨ Generate AI Draft]      [📋 Copy Docstring]      [Mark Finding Reviewed]           |
++-----------------------------------------------------------------------------------------+
+```
+
+#### **3. Four-State UI Lifecycle**
+
+- **Empty State**: First-time users are greeted with intuitive onboarding illustrations: *"No codebases analyzed yet. Upload a Python project archive (.zip) to inspect documentation health."*
+- **Loading State**: Displays stepped skeleton indicators reflecting the scan pipeline: `[✓] Parsing AST` → `[⟳] Validating Google-Style Docstrings` → `[ ] Computing Quality Metrics`.
+- **Tolerant/Warning State**: When syntax errors are encountered, non-blocking amber banners inform the user: *"2 of 38 files had syntax errors and were skipped. Score computed for 36 valid files [View Log]"*.
+- **Error Recovery State**: If AI rate limits are reached, the system gracefully falls back with retry triggers while preserving all deterministic findings.
+
+#### **4. Accessible Design & Semantic Palette (WCAG 2.1 AA Compliant)**
+
+To prevent usability barriers for color-blind developers (~8% affected by deuteranopia/protanopia), IntelliDoc enforces a multi-cue design pairing color tokens with distinct iconography and textual badges:
+
+| Finding State | Semantic Token | Light Mode Hex | Dark Mode Hex | Visual Cue | Text Badge |
+| --- | --- | --- | --- | --- | --- |
+| **Drift Detected** | Warning Amber | `#D97706` | `#F59E0B` | ⚠️ Alert Triangle | `[Drift]` |
+| **Missing Docstring** | Info Indigo | `#4F46E5` | `#818CF8` | 📖 Book / File | `[Undocumented]` |
+| **Synchronized** | Success Emerald | `#059669` | `#10B981` | 🛡️ Shield Check | `[In Sync]` |
+| **Syntax Error** | Danger Rose | `#E11D48` | `#FB7185` | 🛑 Octagon X | `[Parse Error]` |
+
 ### **4.6 Implementation Status**
 
 The supplied IntelliDoc synopsis is a project synopsis and does not provide a verified implementation-completion table, measured benchmark results, or deployment evidence. Therefore, this document intentionally does not assign a completion percentage or claim that the system is already implemented. The report should be updated during development with actual module status, screenshots, test results, and deployment evidence once those artifacts exist.
@@ -735,6 +905,7 @@ One important consideration is false positives and false negatives. A rule may c
 
 | Requirement Area | SRS IDs | Design Component | Diagram | Tests |
 | --- | --- | --- | --- | --- |
+| Authentication & RBAC | FR-AUTH-001..003 | Authentication and RBAC | Fig. 3.1, Fig. 3.2 | T-01, T-02 |
 | Project scanning | FR-SCAN-001, FR-SCAN-002 | Codebase / Scan Management | Fig. 3.1, Fig. 3.4, Fig. 3.7 | T-03, T-04 |
 | AST analysis | FR-AST-001, FR-AST-002 | AST Parsing | Fig. 3.1, Fig. 3.4 | T-05, T-06 |
 | Documentation drift | FR-DRIFT-001..004 | Documentation Analysis / Drift Detector | Fig. 3.4, Fig. 3.6 | T-07..T-10 |
@@ -759,8 +930,10 @@ One important consideration is false positives and false negatives. A rule may c
 | Malformed Python source | Medium | Medium | Record localized parse errors and continue with other files when possible. |
 | Source-code confidentiality | Medium | High | Minimize context sent to AI; use secure transport and environment-based credentials. |
 | Database failure | Low/Medium | High | Handle errors gracefully and preserve client state where feasible. |
-| Unauthorized data access | Low | High | Use JWT, RBAC, ownership checks and protected API routes. |
-| Large codebase slows scan | Medium | Medium | Keep deterministic analysis efficient; measure performance during testing. |
+| Unauthorized data access / IDOR | Low | High | Use JWT, RBAC, ownership checks (`scan.owner_id == user.id`), and protected API routes. |
+| Malicious archive (Zip Slip / Path traversal) | Low/Medium | High | Sanitize extraction paths with commonpath checks; process in ephemeral scratch directory. |
+| Prompt injection in docstrings | Medium | Medium | Isolate source code within strict XML boundary tags; enforce JSON Schema response mode. |
+| Large codebase slows scan | Medium | Medium | Asynchronous background worker execution with progress reporting; measure performance during testing. |
 | Score interpreted as overall developer quality | Medium | Medium | Document the score as a documentation-related analytical metric only. |
 
 ## **REFERENCES**
@@ -819,18 +992,18 @@ Values in this appendix are proposed defaults unless explicitly defined by the s
 | Method | Endpoint | Purpose | Authentication | Role |
 | --- | --- | --- | --- | --- |
 | POST | /auth/login | Authenticate user and issue JWT | No | All |
-| POST | /scans | Create/start a scan | JWT | Programmer |
-| GET | /scans | List authorized scans | JWT | Programmer / Lead |
-| GET | /scans/{scan_id} | Retrieve scan summary | JWT | Authorized users |
-| GET | /scans/{scan_id}/findings | Retrieve findings | JWT | Authorized users |
-| GET | /functions/{function_id} | Retrieve function detail | JWT | Authorized users |
-| POST | /functions/{function_id}/generate-doc | Request AI documentation draft | JWT | Programmer |
-| POST | /functions/{function_id}/consistency-check | Request AI consistency check | JWT | Programmer |
-| GET | /scores/me | Programmer metrics | JWT | Programmer |
-| GET | /team/scores | Team metrics | JWT | Team Lead |
-| GET | /project/scores | Project metrics | JWT | Project Lead |
+| POST | /scans | Enqueue codebase scan (202 Accepted, async background worker) | JWT | Programmer |
+| GET | /scans | List authorized scans (paginated) | JWT | Programmer / Lead |
+| GET | /scans/{scan_id} | Retrieve scan status & summary (IDOR-protected) | JWT | Owner / Authorized Lead |
+| GET | /scans/{scan_id}/findings | Retrieve paginated findings (filter by severity/type) | JWT | Owner / Authorized Lead |
+| GET | /functions/{function_id} | Retrieve function detail | JWT | Owner / Authorized Lead |
+| POST | /functions/{function_id}/generate-doc | Request AI documentation draft (rate-limited) | JWT | Programmer |
+| POST | /functions/{function_id}/consistency-check | Request AI consistency check (rate-limited) | JWT | Programmer |
+| GET | /scores/me | Programmer metrics & history | JWT | Programmer |
+| GET | /team/scores | Team metrics (authorized members only) | JWT | Team Lead |
+| GET | /project/scores | Project metrics across teams | JWT | Project Lead |
 
-This appendix is a proposed API baseline, not a statement that these endpoints have already been implemented. Exact response schemas, pagination and error objects should be finalized during implementation.
+This appendix is a proposed API baseline, not a statement that these endpoints have already been implemented. Responses use standard HTTP status codes (e.g., 202 for queued scans, 403 for unauthorized resource access), cursor/offset pagination for findings, and RFC 7807 error objects.
 
 ## **APPENDIX C: SCORING RULES**
 
@@ -844,32 +1017,95 @@ Worked example: suppose a scan contains 100 functions and 80 are documented. Com
 
 ## **APPENDIX D: EXAMPLE ANALYSIS RESULTS**
 
-Example 1 : Missing Parameter Documentation
+### Example 1: Missing Parameter Documentation
 
 Input function:
 
+```python
 def calculate_total(price, tax):
- """
- Calculate the total price.
+    """
+    Calculate the total price.
 
- Args:
- price: Base price.
+    Args:
+        price: Base price.
 
- Returns:
- Total price including tax.
- """
- return price + tax
+    Returns:
+        Total price including tax.
+    """
+    return price + tax
+```
 
-Possible deterministic finding: The function signature contains the parameter “tax”, but the docstring does not document it. Finding type: Missing Parameter Documentation. Severity: Medium (proposed).
+Possible deterministic finding: The function signature contains the parameter `tax`, but the docstring does not document it. Finding type: **Missing Parameter Documentation**. Severity: **Medium** (proposed).
 
-Example 2 : Obsolete Parameter Documentation
+### Example 2: Obsolete Parameter Documentation
 
-If the signature is def calculate_total(price, tax): but the docstring documents an argument named discount that no longer exists, IntelliDoc can report obsolete parameter documentation because the documented name is absent from the current signature.
+If the signature is `def calculate_total(price, tax):` but the docstring documents an argument named `discount` that no longer exists, IntelliDoc can report **obsolete parameter documentation** because the documented name is absent from the current signature.
 
-Example 3 : Missing Documentation
+### Example 3: Missing Documentation
 
-If a function has no docstring, IntelliDoc reports a missing-documentation finding. The Programmer may request an AI-generated draft, but the generated result remains advisory until reviewed by the Programmer.
+If a function has no docstring, IntelliDoc reports a **missing-documentation finding**. The Programmer may request an AI-generated draft, but the generated result remains advisory until reviewed by the Programmer.
 
-Example 4 : AI Logical-Consistency Check
+### Example 4: AI Logical-Consistency Check
 
 A Programmer may select a documented function and request a deeper AI analysis. The result may indicate that the documentation appears consistent, inconsistent, or uncertain, together with an explanation. Such an output is advisory and is not treated as a proof of program correctness.
+
+## **APPENDIX E: SYSTEM TEST SUITE AND SECURITY VERIFICATION**
+
+This appendix formally defines the test cases referenced in the Requirements Traceability Matrix (Table 5.2), including functional verification (T-01 to T-20) and specialized security penetration checks (T-SEC-01 to T-SEC-04).
+
+### **E.1 Functional Test Cases (T-01 to T-20)**
+
+| Test ID | Category | Target Component | Input / Precondition | Expected System Behaviour | Traceability |
+| --- | --- | --- | --- | --- | --- |
+| **T-01** | Auth | Authentication Service | Valid user email and correct password | HTTP 200; JWT access and refresh tokens returned | FR-AUTH-001 |
+| **T-02** | RBAC | Auth / Authorization | Programmer token accessing `GET /project/scores` | HTTP 403 Forbidden; role mismatch logged | FR-AUTH-002, 003 |
+| **T-03** | Scan | Codebase Manager | Archive with `.py`, `.js`, `.md` and hidden files | Discovers and processes valid `.py` files only | FR-SCAN-001 |
+| **T-04** | Parser | AST Parser | Python file containing deliberate syntax error | Localized parse error recorded; remaining files processed | FR-SCAN-002 |
+| **T-05** | AST | Function Extractor | Standard, async, and class method definitions | Function name, line number, and params correctly extracted | FR-AST-001 |
+| **T-06** | AST | Docstring Extractor | Functions with Google docstring, block string, or none | Docstring text extracted and normalized | FR-AST-002 |
+| **T-07** | Drift | Drift Detector | Function has `(a, b)` but docstring documents `a` only | `MISSING_PARAM_DOC` finding generated for `b` (Medium) | FR-DRIFT-001, 002 |
+| **T-08** | Drift | Drift Detector | Function has `(a)` but docstring documents `a, b` | `OBSOLETE_PARAM_DOC` finding generated for `b` (High) | FR-DRIFT-003 |
+| **T-09** | Drift | Drift Detector | Function returns value but docstring lacks `Returns:` | `MISSING_RETURN_DOC` finding generated (Low) | FR-DRIFT-004 |
+| **T-10** | Drift | Drift Detector | Function signature matches docstring exactly | Zero drift findings; 100% consistency score | FR-DRIFT-001 |
+| **T-11** | Missing | Missing Doc Module | Function completely lacking docstring statement | `NO_DOCSTRING` finding generated (Medium) | FR-MISSING-001 |
+| **T-12** | AI | Doc Generator (Groq) | Undocumented function context submitted | Valid Google-style draft docstring generated (Advisory) | FR-AI-DOC-001 |
+| **T-13** | AI | Review Workflow | Programmer reviews, edits, and accepts AI draft | Advisory draft recorded; deterministic findings preserved | FR-AI-DOC-002 |
+| **T-14** | AI | Consistency (Gemini) | Documented function with subtle semantic drift | Advisory consistency assessment and reasoning returned | FR-AI-CHECK-001 |
+| **T-15** | Score | Scoring Engine | Codebase with 80% doc coverage and 3 drift findings | Score computed strictly in 0–100 range with breakdown | FR-SCORE-001 |
+| **T-16** | History | Persistence / DB | Consecutive scans across codebase revisions | Historical scores and findings persisted and queryable | FR-HIST-001 |
+| **T-17** | UI | Programmer Dashboard | Authenticated Programmer logs in | Shows personal scan history, diff viewer, and findings | FR-PROG-001 |
+| **T-18** | UI | Team Lead Dashboard | Authenticated Team Lead logs in | Shows authorized team member metrics and team DRS gauge | FR-TEAM-001 |
+| **T-19** | UI | Project Lead Dashboard| Authenticated Project Lead logs in | Shows cross-team comparative metrics and portfolio trends | FR-PROJ-001 |
+| **T-20** | API | FastAPI Endpoints | Full REST workflow from auth to scan query | All responses follow schemas with correct HTTP status codes | FR-API-001 |
+
+### **E.2 Security & Penetration Test Cases**
+
+| Test ID | Threat Target | Vulnerability Class | Test Scenario | Expected Defensive Behaviour |
+| --- | --- | --- | --- | --- |
+| **T-SEC-01** | BOLA / IDOR | OWASP API1:2023 | Programmer A calls `GET /scans/{id_of_programmer_b}` | HTTP 403 Forbidden; access denied via ownership check |
+| **T-SEC-02** | Zip Slip | CWE-22 / CWE-23 | Upload ZIP containing relative paths (e.g. `../../app/main.py`) | Archive extraction halted with security exception |
+| **T-SEC-03** | Prompt Injection | OWASP LLM01:2025 | Docstring containing instructions to override system prompt | Code wrapped in strict XML tags; model returns JSON schema |
+| **T-SEC-04** | Rate Limiting | OWASP API4:2023 | 10 rapid POST requests to AI generation endpoint | HTTP 429 Too Many Requests returned on request threshold |
+
+### **E.3 Archive Ingestion Security Reference (Zip Slip Defense)**
+
+To prevent arbitrary file overwrite attacks during codebase upload, archive extraction enforces path canonicalization:
+
+```python
+import os
+import zipfile
+
+def safe_extract_archive(zip_path: str, target_dir: str) -> list[str]:
+    extracted_files = []
+    base_dir = os.path.abspath(target_dir)
+    with zipfile.ZipFile(zip_path, 'r') as archive:
+        for member in archive.infolist():
+            target_path = os.path.abspath(os.path.join(base_dir, member.filename))
+            if not target_path.startswith(base_dir + os.sep):
+                raise SecurityError(f"Zip Slip attack attempt detected: {member.filename}")
+            if not member.is_dir() and member.filename.endswith('.py'):
+                archive.extract(member, base_dir)
+                extracted_files.append(target_path)
+    return extracted_files
+```
+
