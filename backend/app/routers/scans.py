@@ -1,9 +1,10 @@
 """IntelliDoc — Scans router with background worker pattern."""
+import json
 import os
 import tempfile
 import asyncio
 from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, BackgroundTasks, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, BackgroundTasks, Query
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.security import get_current_user, require_role
@@ -15,6 +16,7 @@ from app.models.models import (
 from app.schemas.schemas import ScanOut, ScanListItem, FindingOut, FindingPage, FunctionOut
 from app.analysis.engine import analyse_codebase, safe_extract_archive, SecurityError
 from app.analysis.ai_service import generate_docstring, check_consistency, AIServiceError
+from app.core.rate_limit import limiter
 
 router = APIRouter(prefix="/scans", tags=["Scans"])
 
@@ -353,7 +355,9 @@ def get_scan_functions(
 # ─── AI Endpoints ─────────────────────────────────────────────────────────────
 
 @router.post("/functions/{function_id}/generate-doc")
+@limiter.limit("5/minute")
 async def generate_doc(
+    request: Request,
     function_id: str,
     current_user: User = Depends(require_role(UserRole.programmer)),
     db: Session = Depends(get_db),
@@ -395,7 +399,9 @@ async def generate_doc(
 
 
 @router.post("/functions/{function_id}/consistency-check")
+@limiter.limit("5/minute")
 async def consistency_check(
+    request: Request,
     function_id: str,
     current_user: User = Depends(require_role(UserRole.programmer)),
     db: Session = Depends(get_db),
@@ -425,7 +431,6 @@ async def consistency_check(
             func.name, func.params or [], func.source_body or "", func.docstring or ""
         )
         analysis.status = AIAnalysisStatus.completed
-        import json
         analysis.result = json.dumps(result)
         analysis.provider = result["provider"]
         db.commit()
@@ -435,6 +440,54 @@ async def consistency_check(
         analysis.error_detail = str(e)
         db.commit()
         raise HTTPException(status_code=503, detail=f"AI service unavailable: {str(e)}")
+
+
+# ─── Standalone Function Detail ────────────────────────────────────────────────
+
+@router.get("/functions/{function_id}", response_model=FunctionOut)
+def get_function_detail(
+    function_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Get detailed information about a single function (SRS Appendix B)."""
+    func = db.query(Function).filter(Function.id == function_id).first()
+    if not func:
+        raise HTTPException(status_code=404, detail="Function not found")
+
+    _check_function_access(func, current_user, db)
+
+    sf = db.query(SourceFile).filter(SourceFile.id == func.file_id).first()
+    findings = [
+        FindingOut(
+            id=f.id,
+            finding_type=f.finding_type.value,
+            severity=f.severity.value,
+            explanation=f.explanation,
+            extra=f.extra or {},
+            function_id=f.function_id,
+            function_name=func.name,
+            function_line=func.line_number,
+            file_path=sf.path if sf else None,
+        )
+        for f in func.findings
+    ]
+    from app.schemas.schemas import AIAnalysisOut
+    ai_analyses = [AIAnalysisOut.model_validate(a) for a in func.ai_analyses]
+
+    return FunctionOut(
+        id=func.id,
+        name=func.name,
+        line_number=func.line_number,
+        signature=func.signature,
+        has_docstring=func.has_docstring,
+        docstring=func.docstring,
+        params=func.params or [],
+        has_return_statement=func.has_return_statement,
+        file_path=sf.path if sf else None,
+        findings=findings,
+        ai_analyses=ai_analyses,
+    )
 
 
 # ─── Access Control Helpers ────────────────────────────────────────────────────

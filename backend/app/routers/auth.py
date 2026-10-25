@@ -1,5 +1,5 @@
 """IntelliDoc — Authentication router."""
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.core.database import get_db
@@ -10,12 +10,14 @@ from app.core.security import (
 )
 from app.models.models import User, UserRole, Team
 from app.schemas.schemas import LoginRequest, RegisterRequest, TokenResponse, RefreshRequest, UserOut
+from app.core.rate_limit import limiter
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
-def register(body: RegisterRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def register(request: Request, body: RegisterRequest, db: Session = Depends(get_db)):
     """Register a new user account."""
     if db.query(User).filter(User.email == body.email).first():
         raise HTTPException(status_code=409, detail="Email already registered")
@@ -48,7 +50,8 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(body: LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, body: LoginRequest, db: Session = Depends(get_db)):
     """Authenticate and receive JWT tokens."""
     user = db.query(User).filter(User.email == body.email, User.is_active == True).first()
     if not user or not verify_password(body.password, user.password_hash):
