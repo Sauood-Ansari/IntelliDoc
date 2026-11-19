@@ -7,7 +7,11 @@ $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 $pythonPath = Join-Path $projectRoot '.venv\Scripts\python.exe'
 $nodeCommand = Get-Command node -ErrorAction SilentlyContinue
-if ($nodeCommand) { $nodePath = $nodeCommand.Source } else {
+if ($nodeCommand) {
+  $nodePath = $nodeCommand.Source
+} elseif (Test-Path "$env:APPDATA\fnm\aliases\default\node.exe") {
+  $nodePath = "$env:APPDATA\fnm\aliases\default\node.exe"
+} else {
   $nodePath = Join-Path $env:USERPROFILE '.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe'
 }
 if (!(Test-Path -LiteralPath $pythonPath) -or !(Test-Path -LiteralPath $nodePath)) {
@@ -34,11 +38,11 @@ if ($Seed) {
 }
 $logsPath = Join-Path $projectRoot 'logs'
 New-Item -ItemType Directory -Force $logsPath | Out-Null
-$api = Start-Process -FilePath $pythonPath -ArgumentList "-m uvicorn app.main:app --host 127.0.0.1 --port $ApiPort" -WorkingDirectory $backendPath -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $logsPath 'backend.log') -RedirectStandardError (Join-Path $logsPath 'backend-error.log')
+$api = Start-Process -FilePath $pythonPath -ArgumentList @('-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', "$ApiPort") -WorkingDirectory $backendPath -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $logsPath 'backend.log') -RedirectStandardError (Join-Path $logsPath 'backend-error.log')
 $previousBackendUrl = $env:BACKEND_URL
 try {
   $env:BACKEND_URL = "http://127.0.0.1:$ApiPort"
-  $web = Start-Process -FilePath $nodePath -ArgumentList "node_modules/next/dist/bin/next dev --hostname 127.0.0.1 --port $WebPort" -WorkingDirectory $frontendPath -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $logsPath 'frontend.log') -RedirectStandardError (Join-Path $logsPath 'frontend-error.log')
+  $web = Start-Process -FilePath $nodePath -ArgumentList @('node_modules/next/dist/bin/next', 'dev', '--hostname', '127.0.0.1', '--port', "$WebPort") -WorkingDirectory $frontendPath -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $logsPath 'frontend.log') -RedirectStandardError (Join-Path $logsPath 'frontend-error.log')
 } catch {
   $api.Kill()
   throw
