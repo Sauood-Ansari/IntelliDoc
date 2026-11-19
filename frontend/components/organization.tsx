@@ -17,6 +17,7 @@ export function DirectorySelect({ kind, value, onChange, projectId = "", disable
   const [search, setSearch] = useState("");
   const [options, setOptions] = useState<Option[]>([]);
   const [selected, setSelected] = useState<Option | null>(null);
+  const [unapprovedMatch, setUnapprovedMatch] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const singular = kind === "projects" ? "project" : "team";
@@ -27,7 +28,7 @@ export function DirectorySelect({ kind, value, onChange, projectId = "", disable
     return { id: record.project_id, name: record.project_name };
   }
 
-  useEffect(() => { setSearch(""); setOptions([]); }, [projectId]);
+  useEffect(() => { setSearch(""); setOptions([]); setUnapprovedMatch(null); }, [projectId]);
 
   useEffect(() => {
     if (!value) { setSelected(null); return; }
@@ -45,9 +46,24 @@ export function DirectorySelect({ kind, value, onChange, projectId = "", disable
       const query = new URLSearchParams({ search, limit: "100" });
       if (eligible) query.set("eligible", "true");
       if (kind === "teams") query.set("project_id", projectId);
-      api<(Project | Team)[]>(`/${kind}?${query}`, { signal: controller.signal }).then(records => {
+      api<(Project | Team)[]>(`/${kind}?${query}`, { signal: controller.signal }).then(async records => {
         setOptions(records.map(option));
         setError("");
+        if (eligible && records.length === 0 && search.trim()) {
+          try {
+            const raw = await api<(Project | Team)[]>(`/${kind}?search=${encodeURIComponent(search)}&limit=5`, { signal: controller.signal });
+            if (raw.length > 0) {
+              const matchName = "team_name" in raw[0] ? raw[0].team_name : raw[0].project_name;
+              setUnapprovedMatch(matchName);
+            } else {
+              setUnapprovedMatch(null);
+            }
+          } catch {
+            setUnapprovedMatch(null);
+          }
+        } else {
+          setUnapprovedMatch(null);
+        }
       }).catch(exception => { if (!controller.signal.aborted) setError(exception.message); })
         .finally(() => { if (!controller.signal.aborted) setLoading(false); });
     }, 200);
@@ -66,7 +82,11 @@ export function DirectorySelect({ kind, value, onChange, projectId = "", disable
     {value && <span className="field-note mono">{value}</span>}
     {error && <span className="field-error" role="alert">{error}</span>}
     {!loading && !error && !choices.length && !unavailable && <span className="field-note">
-      {search ? "No matches. Check the name or paste the complete ID." : eligible ? "No approved choices yet. Request access and wait for the responsible lead to approve it." : kind === "projects"
+      {unapprovedMatch ? (
+        <span style={{ color: "#b45309", fontWeight: 500, display: "block", marginTop: "0.25rem" }}>
+          ⚠️ Project &ldquo;{unapprovedMatch}&rdquo; exists, but you need Project Lead approval first. Please request permission in the <strong>Project access</strong> tab above.
+        </span>
+      ) : search ? "No matches. Check the name or paste the complete ID." : eligible ? "No approved choices yet. Go to the \"Project access\" tab to request permission, and wait for the Project Lead to approve it." : kind === "projects"
         ? "A Project Lead needs to create a project first."
         : "A Team Lead needs to create a team in this project first."}
     </span>}
