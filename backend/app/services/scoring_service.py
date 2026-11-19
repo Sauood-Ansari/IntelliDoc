@@ -1,4 +1,6 @@
-from app.models import Score, Scan, Codebase, User, Team, Project, UserRole
+from app.models import Score, Scan, Codebase, User, Team, Project, UserRole, TeamMembership, MembershipStatus
+from sqlalchemy import or_
+from app.access import codebases_in_team
 
 class ScoringService:
     SEVERITY_PENALTIES = {"High": 4.0, "Medium": 2.0, "Low": 1.0}
@@ -41,12 +43,20 @@ class ScoringService:
         team = db.get(Team, team_id)
         ranked = []
         weighted = weight = 0
-        members = db.query(User).filter(User.team_id == team_id, User.role == UserRole.PROGRAMMER).all()
+        codebases = codebases_in_team(db, db.query(Codebase), team_id)
+        if project_id is not None:
+            codebases = codebases.filter(Codebase.project_id == project_id)
+        owners = codebases.with_entities(Codebase.owner_id)
+        approved_members = {row[0] for row in db.query(TeamMembership.programmer_id).filter_by(
+            team_id=team_id, status=MembershipStatus.APPROVED).all()}
+        members = db.query(User).filter(User.role == UserRole.PROGRAMMER,
+            or_(User.user_id.in_(owners), User.user_id.in_(approved_members), User.team_id == team_id)).all()
         for user in members:
-            query = db.query(Score).join(Scan).join(Codebase).filter(Score.programmer_id == user.user_id)
+            query = db.query(Score).join(Scan).filter(Score.programmer_id == user.user_id,
+                Scan.codebase_id.in_(codebases.with_entities(Codebase.codebase_id)))
             if project_id is not None:
-                query = query.filter(Codebase.project_id == project_id)
-                if not db.query(Codebase).filter(Codebase.owner_id == user.user_id, Codebase.project_id == project_id).first():
+                if not codebases.filter(Codebase.owner_id == user.user_id).first() and not (
+                    team.project_id == project_id and user.user_id in approved_members):
                     continue
             # Latest scan per codebase avoids an unrelated codebase replacing a programmer's whole score.
             seen, subtotal, count = set(), 0, 0
@@ -71,9 +81,11 @@ class ScoringService:
     @classmethod
     def aggregate_project_scores(cls, db, project_id):
         project = db.get(Project, project_id)
-        teams = db.query(Team).join(User, User.team_id == Team.team_id).join(
-            Codebase, Codebase.owner_id == User.user_id).filter(Codebase.project_id == project_id).distinct().all()
+        legacy_teams = db.query(User.team_id).join(Codebase, Codebase.owner_id == User.user_id).filter(
+            Codebase.project_id == project_id, Codebase.team_id.is_(None))
+        teams = db.query(Team).filter(or_(Team.project_id == project_id, Team.team_id.in_(legacy_teams))).all()
         rows, weighted, weight = [], 0, 0
+        programmers = {}
         for team in teams:
             data = cls.aggregate_team_scores(db, team.team_id, project_id)
             size = data["functions_count"]
@@ -82,8 +94,21 @@ class ScoringService:
             rows.append({"team_id": str(team.team_id), "team_name": team.team_name,
                          "average_score": data["average_documentation_score"],
                          "functions_count": size, "programmers_count": data["programmers_count"]})
+            for member in data["ranked_programmers"]:
+                entry = programmers.setdefault(member["programmer_id"], {
+                    "programmer_id": member["programmer_id"], "name": member["name"], "email": member["email"],
+                    "teams": [], "functions_count": 0, "weighted_score": 0.0})
+                entry["teams"].append({"team_id": str(team.team_id), "team_name": team.team_name})
+                entry["functions_count"] += member["functions_count"]
+                entry["weighted_score"] += (member["latest_score"] or 0) * member["functions_count"]
         rows.sort(key=lambda r: (r["average_score"] is not None, r["average_score"] or 0), reverse=True)
+        ranked_programmers = []
+        for entry in programmers.values():
+            subtotal = entry.pop("weighted_score")
+            entry["latest_score"] = round(subtotal / entry["functions_count"], 2) if entry["functions_count"] else None
+            ranked_programmers.append(entry)
+        ranked_programmers.sort(key=lambda r: (r["latest_score"] is not None, r["latest_score"] or 0), reverse=True)
         return {"project_id": str(project_id), "project_name": project.project_name,
                 "average_project_score": round(weighted / weight, 2) if weight else None,
-                "teams_count": len(rows), "ranked_teams": rows}
+                "teams_count": len(rows), "ranked_teams": rows, "ranked_programmers": ranked_programmers}
 

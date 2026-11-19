@@ -3,6 +3,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY app ./app
+COPY components ./components
 COPY lib ./lib
 COPY next.config.ts tsconfig.json ./
 RUN npm run build

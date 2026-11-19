@@ -1,4 +1,4 @@
-"""Trusted administrator CLI. Role and membership changes are never public API actions."""
+"""Local maintenance CLI. Normal project and team setup is available in the web app."""
 import argparse
 import getpass
 from uuid import UUID
@@ -18,6 +18,7 @@ def main():
     team = commands.add_parser("add-team")
     team.add_argument("--name", required=True)
     team.add_argument("--lead-email", required=True)
+    team.add_argument("--project", required=True)
     project = commands.add_parser("add-project")
     project.add_argument("--name", required=True)
     project.add_argument("--lead-email", required=True)
@@ -27,6 +28,7 @@ def main():
     link = commands.add_parser("assign-codebase")
     link.add_argument("--codebase", required=True)
     link.add_argument("--project", required=True)
+    link.add_argument("--team", required=True)
     commands.add_parser("list")
     args = parser.parse_args()
     with SessionLocal() as db:
@@ -66,10 +68,14 @@ def main():
                     raise ValueError("Team leader must have Team Lead role")
                 if not args.name.strip() or len(args.name) > 100:
                     raise ValueError("Team name must contain 1–100 characters")
-                record = Team(team_name=args.name, team_lead_id=lead.user_id)
+                project = db.get(Project, UUID(args.project))
+                if not project:
+                    raise ValueError("Create a project first")
+                record = Team(team_name=args.name, team_lead_id=lead.user_id, project_id=project.project_id)
                 db.add(record)
                 db.flush()
-                lead.team_id = record.team_id
+                if lead.team_id is None:
+                    lead.team_id = record.team_id
             elif args.command == "add-project":
                 lead = user(args.lead_email)
                 if lead.role != UserRole.PROJECT_LEAD:
@@ -86,9 +92,13 @@ def main():
             else:
                 codebase = db.get(Codebase, UUID(args.codebase))
                 project = db.get(Project, UUID(args.project))
-                if not codebase or not project:
-                    raise ValueError("Codebase or project does not exist")
+                team = db.get(Team, UUID(args.team))
+                if not codebase or not project or not team or team.project_id != project.project_id:
+                    raise ValueError("Choose an existing codebase and a team belonging to the project")
+                if codebase.scans and (codebase.project_id != project.project_id or codebase.team_id not in (None, team.team_id)):
+                    raise ValueError("Scanned codebases keep their saved project/team assignment")
                 codebase.project_id = project.project_id
+                codebase.team_id = team.team_id
             db.commit()
             print("Saved. Use 'python -m app.manage list' to inspect assignments.")
         except (ValueError, IntegrityError) as exc:

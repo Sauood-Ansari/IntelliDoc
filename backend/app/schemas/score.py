@@ -36,3 +36,4 @@ class ProjectScoreOut(BaseModel):
     average_project_score: Optional[float]
     teams_count: int
     ranked_teams: List[Dict[str, Any]]
+    ranked_programmers: List[Dict[str, Any]] = []

@@ -9,6 +9,7 @@ from app.database import get_db
 from app.main import app
 from app.models.user import User, UserRole, Team, Project
 from app.models.codebase import Codebase
+from app.models import ProjectAccessRequest, TeamMembership, AccessStatus, MembershipStatus
 from app.services.auth_service import AuthService
 
 TEST_DATABASE_URL = "sqlite:///./test_intellidoc.db"
@@ -29,7 +30,10 @@ def db_session():
 
 
 @pytest.fixture
-def client(db_session):
+def client(db_session, monkeypatch):
+    from app.config import settings
+    # The fixture owns its in-memory schema; never create tables in the user's DB.
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
     def override_get_db():
         try:
             yield db_session
@@ -38,6 +42,12 @@ def client(db_session):
 
     app.dependency_overrides[get_db] = override_get_db
     with TestClient(app) as test_client:
+        # Independent tests must not share the production middleware's IP quota.
+        middleware = app.middleware_stack
+        while middleware is not None:
+            if hasattr(middleware, "requests"):
+                middleware.requests.clear()
+            middleware = getattr(middleware, "app", None)
         yield test_client
     app.dependency_overrides.clear()
 
@@ -78,9 +88,14 @@ def test_users(db_session):
     project = Project(project_name="Core Project", project_lead_id=proj_lead.user_id)
     db_session.add(project)
     db_session.flush()
+    team.project_id = project.project_id
 
-    codebase = Codebase(name="Main Repo", owner_id=prog.user_id, project_id=project.project_id)
+    codebase = Codebase(name="Main Repo", owner_id=prog.user_id, project_id=project.project_id, team_id=team.team_id)
     db_session.add(codebase)
+    db_session.add(ProjectAccessRequest(project_id=project.project_id, team_lead_id=lead.user_id,
+        status=AccessStatus.APPROVED, decided_by=proj_lead.user_id))
+    db_session.add(TeamMembership(team_id=team.team_id, programmer_id=prog.user_id,
+        status=MembershipStatus.APPROVED, decided_by=lead.user_id))
     db_session.commit()
 
     return {

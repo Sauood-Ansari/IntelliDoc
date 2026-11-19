@@ -29,11 +29,12 @@ def test_protected_endpoint_no_token(client):
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-def test_create_codebase_programmer(client, programmer_token):
+def test_create_codebase_programmer(client, programmer_token, test_users):
     # T-03: Register codebase
     response = client.post(
         "/api/v1/codebases",
-        json={"name": "New Codebase"},
+        json={"name": "New Codebase", "project_id": str(test_users['project'].project_id),
+              "team_id": str(test_users['team'].team_id)},
         headers={"Authorization": f"Bearer {programmer_token}"}
     )
     assert response.status_code == status.HTTP_201_CREATED

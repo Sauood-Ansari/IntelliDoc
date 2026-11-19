@@ -45,8 +45,8 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     """
     Registration endpoint to create new users for evaluation and onboarding.
     """
-    if user_in.role != UserRole.PROGRAMMER or user_in.team_id is not None:
-        raise HTTPException(403, "Public registration creates unassigned Programmer accounts only")
+    if user_in.team_id is not None:
+        raise HTTPException(422, "Choose the project and team when uploading code")
     if len(user_in.password.encode("utf-8")) > 72:
         raise HTTPException(422, "Password must be at most 72 UTF-8 bytes")
     user_in.email = user_in.email.lower()

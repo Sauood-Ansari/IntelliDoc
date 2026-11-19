@@ -1,150 +1,224 @@
 "use client";
-import {useEffect,useState,useCallback, useRef} from "react";
-import {Activity,ArrowDownToLine,ArrowLeft,ArrowRight,BookOpen,Check,ChevronRight,Code2,FileCode2,FolderGit2,History,LayoutDashboard,LoaderCircle,LogOut,Plus,Search,ShieldCheck,Sparkles,UploadCloud,Users,X,AlertTriangle,SlidersHorizontal} from "lucide-react";
-import {api,User,Codebase,Scan,Func,SourceFile,Analysis,Metrics} from "@/lib/api";
 
-const number = (n:number|null|undefined) => n == null ? "N/A" : Number(n.toFixed(1)).toString();
-const date = (s:string) => new Date(s.endsWith("Z") ? s : s+"Z").toLocaleString(undefined,{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});
-const message = (e:unknown) => e instanceof Error ? e.message : "Something went wrong";
-function Badge({children,tone=""}:{children:React.ReactNode;tone?:string}) {return <span className={"badge "+tone}>{children}</span>}
-function Empty({title,text}:{title:string;text:string}) {return <div className="empty"><FolderGit2 size={32}/><h3>{title}</h3><p>{text}</p></div>}
-function Brand() {return <div className="brand"><span className="brandmark"><BookOpen size={20}/></span>IntelliDoc<span className="beta">BETA</span></div>}
-function Spinner() {return <LoaderCircle className="spin" size={17}/>}
+import { useCallback, useEffect, useRef, useState } from "react";
+import { LogOut, Plus, RefreshCw } from "lucide-react";
+import { api, Codebase, Metrics, Project, Scan, Team, User } from "@/lib/api";
+import { SignIn } from "@/components/sign-in";
+import { Organization } from "@/components/organization";
+import { MembershipAccess } from "@/components/membership-access";
+import { UploadScan } from "@/components/upload-scan";
+import { dateText, ScanResults, scoreText, ScoringGuide, Status } from "@/components/scan-results";
 
-export default function Home(){
- const [user,setUser]=useState<User|null>(null),[boot,setBoot]=useState(true);
- const [view,setView]=useState("Overview"),[scans,setScans]=useState<Scan[]>([]),[codebases,setCodebases]=useState<Codebase[]>([]);
- const [metrics,setMetrics]=useState<Metrics>({}),[error,setError]=useState(""),[busy,setBusy]=useState(false);
- const [selected,setSelected]=useState<Scan|null>(null),[functions,setFunctions]=useState<Func[]>([]),[files,setFiles]=useState<SourceFile[]>([]);
- const [active,setActive]=useState<Func|null>(null),[analyses,setAnalyses]=useState<Analysis[]>([]);
- const [search,setSearch]=useState(""),[filter,setFilter]=useState("All functions"),[tab,setTab]=useState("Findings");
- const [upload,setUpload]=useState(false),[newName,setNewName]=useState(""),[baseId,setBaseId]=useState(""),[file,setFile]=useState<File|null>(null);
- const [email,setEmail]=useState(""),[password,setPassword]=useState(""),[name,setName]=useState(""),[register,setRegister]=useState(false);
- const [notice,setNotice]=useState(""),[aiBusy,setAiBusy]=useState(false),[draft,setDraft]=useState(""),[offset,setOffset]=useState(0);
- const fileRef=useRef<HTMLInputElement>(null);
- const load=useCallback(async(u:User)=>{
-   const endpoint=u.role==="Programmer"?"/scores/me":u.role==="Team Lead"?"/team/scores":"/project/scores";
-   const [ss,cc,mm]=await Promise.all([api<Scan[]>("/scans?limit=50"),api<Codebase[]>("/codebases"),api<Metrics>(endpoint).catch(e=>{setNotice(message(e)); return {} as Metrics})]);
-   setScans(ss);setCodebases(cc);setMetrics(mm);setOffset(0);
- },[]);
- useEffect(()=>{
-   api<User>("/auth/me").then(async u=>{setUser(u);await load(u)}).catch(()=>{}).finally(()=>setBoot(false));
-   const expired=()=>{setUser(null);setSelected(null);setActive(null);setError("Your session has expired. Sign in again.")};
-   window.addEventListener("session-expired",expired);
-   return ()=>window.removeEventListener("session-expired",expired);
- },[load]);
- useEffect(()=>{if(!notice)return;const id=setTimeout(()=>setNotice(""),7000);return()=>clearTimeout(id)},[notice]);
- useEffect(()=>{const close=(e:KeyboardEvent)=>{if(e.key==="Escape"&&!busy&&!aiBusy){setActive(null);setUpload(false)}};window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close)},[busy,aiBusy]);
- useEffect(()=>{window.scrollTo({top:0,behavior:"instant"})},[view,selected?.scan_id]);
- useEffect(()=>{
-   if(!upload&&!active)return;
-   const previous=document.activeElement as HTMLElement|null;
-   const dialog=document.querySelector<HTMLElement>('[role="dialog"]');
-   const selector='button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),a[href]';
-   const previousOverflow=document.body.style.overflow;
-   document.body.style.overflow="hidden";
-   dialog?.querySelector<HTMLElement>(selector)?.focus();
-   const trap=(e:KeyboardEvent)=>{
-     if(e.key!=="Tab"||!dialog)return;
-     const elements=Array.from(dialog.querySelectorAll<HTMLElement>(selector)).filter(x=>x.offsetParent!==null);
-     const first=elements[0],last=elements.at(-1);
-     if(e.shiftKey&&document.activeElement===first){e.preventDefault();last?.focus()}
-     else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first?.focus()}
-   };
-   document.addEventListener("keydown",trap);
-   return()=>{document.body.style.overflow=previousOverflow;document.removeEventListener("keydown",trap);previous?.focus()};
- },[upload,active?.function_id]);
- async function login(e:React.FormEvent){
-   e.preventDefault();setBusy(true);setError("");
-   try {
-     if(register) await api("/auth/register",{method:"POST",body:JSON.stringify({name,email,password,role:"Programmer"})});
-     const u=await api<User>("/auth/login",{method:"POST",body:JSON.stringify({email,password})});
-     setUser(u);setPassword("");await load(u);
-   }catch(e){setError(message(e))}finally{setBusy(false)}
- }
- async function logout(){try{await api("/auth/logout",{method:"POST"});setUser(null);setSelected(null);setActive(null);setScans([]);setView("Overview");setError("")}catch(e){setError(message(e))}}
- async function openScan(s:Scan){
-   setBusy(true);setError("");setActive(null);
-   try{
-     const [ff,ss]=await Promise.all([api<Func[]>("/scans/"+s.scan_id+"/functions"),api<SourceFile[]>("/scans/"+s.scan_id+"/files")]);
-     setSelected(s);setFunctions(ff);setFiles(ss);setSearch("");setFilter("All functions");setTab("Findings");
-   }catch(e){setError(message(e))}finally{setBusy(false)}
- }
- async function openFunction(f:Func){
-   setError("");setActive(f);setAnalyses([]);setDraft("");
-   try{const a=await api<Analysis[]>("/functions/"+f.function_id+"/analyses");setAnalyses(a);const d=a.filter(x=>x.analysis_type==="Draft Generation"&&x.status==="Completed").at(-1);if(d)setDraft(d.reviewed_text||d.result)}
-   catch(e){setError(message(e))}
- }
- async function scan(e:React.FormEvent){
-   e.preventDefault();if(!file||!user)return;
-   if(file.size>10*1024*1024){setError("Choose a ZIP file under 10 MB.");return}
-   setBusy(true);setError("");
-   try{
-     let id=baseId;
-     if(!id){const cb=await api<Codebase>("/codebases",{method:"POST",body:JSON.stringify({name:newName.trim()})});id=cb.codebase_id;setBaseId(id)}
-     const data=new FormData();data.append("codebase_id",id);data.append("file",file);
-     const s=await api<Scan>("/scans",{method:"POST",body:data});
-     setUpload(false);setFile(null);setNewName("");await load(user);await openScan(s);
-     setNotice(s.status==="Completed"?"Analysis complete. Your findings are ready.":"Analysis finished. Review the file errors for details.");
-   }catch(e){setError(message(e));await load(user).catch(()=>{})}finally{setBusy(false)}
- }
- async function runAI(kind:string){
-   if(!active)return;setAiBusy(true);setError("");
-   try{const a=await api<Analysis>("/functions/"+active.function_id+"/"+kind,{method:"POST"});setAnalyses(old=>[...old,a]);if(a.analysis_type==="Draft Generation"&&a.status==="Completed")setDraft(a.result)}
-   catch(e){setError(message(e))}finally{setAiBusy(false)}
- }
- async function review(a:Analysis,decision:string){
-   if(!active)return;setAiBusy(true);
-   try{const updated=await api<Analysis>("/functions/"+active.function_id+"/analyses/"+a.analysis_id,{method:"PATCH",body:JSON.stringify({decision,edited_text:draft})});setAnalyses(old=>old.map(x=>x.analysis_id===a.analysis_id?updated:x));setNotice("Review saved. Copy accepted documentation into your code and rescan to update the score.")}
-   catch(e){setError(message(e))}finally{setAiBusy(false)}
- }
- function download(){
-   if(!selected)return;
-   const blob=new Blob([JSON.stringify({scan:selected,files,functions},null,2)],{type:"application/json"});
-   const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="intellidoc-report-"+selected.scan_id.slice(0,8)+".json";a.click();URL.revokeObjectURL(url);
- }
- const cbName=(id:string)=>codebases.find(c=>c.codebase_id===id)?.name||"Codebase";
- const programmer=user?.role==="Programmer";
- const latest=scans.find(s=>s.status==="Completed"||s.status==="Partial");
- const currentScore=programmer?metrics.latest_score:user?.role==="Team Lead"?metrics.average_documentation_score:metrics.average_project_score;
- const summary=selected?.summary||latest?.summary;
- const findingsCount=functions.reduce((n,f)=>n+f.findings.length,0);
- const filtered=functions.filter(f=>(f.qualified_name+" "+f.file_path+" "+f.findings.map(x=>x.type).join(" ")).toLowerCase().includes(search.toLowerCase())&&(filter==="All functions"||filter==="With findings"&&f.findings.length>0||filter==="Undocumented"&&!f.has_docstring||filter==="Clean"&&f.findings.length===0));
- const nav=[{label:"Overview",icon:LayoutDashboard},{label:"Codebases",icon:FolderGit2},{label:"Scan history",icon:History},...(!programmer?[{label:"Team insights",icon:Users}]:[]),{label:"Scoring guide",icon:BookOpen}];
- if(boot)return <div className="boot"><Brand/><Spinner/><p>Opening your workspace…</p></div>;
- if(!user)return <main className="auth"><section className="auth-story"><Brand/><div><Badge tone="green">DOCUMENTATION INTELLIGENCE</Badge><h1>Code evolves.<br/>Keep your docs<br/><em>in the loop.</em></h1><p>Find the gap between what your code does and what its documentation says.</p><div className="auth-points"><span><ShieldCheck/>Explainable Python analysis</span><span><Activity/>A clearer picture of quality</span><span><Users/>Built for the whole team</span></div></div><small>IntelliDoc · University mini project</small></section><section className="auth-form"><div className="auth-card"><span className="eyebrow">YOUR WORKSPACE AWAITS</span><h2>{register?"Start with clearer documentation.":"Welcome back."}</h2><p>{register?"Create your programmer account to begin.":"Sign in to your documentation workspace."}</p>{error&&<div role="alert" className="error">{error}</div>}<form onSubmit={login}>{register&&<label>Full name<input autoComplete="name" required maxLength={100} value={name} onChange={e=>setName(e.target.value)}/></label>}<label>Email address<input type="email" autoComplete="email" placeholder="you@example.com" required value={email} onChange={e=>setEmail(e.target.value)}/></label><label>Password<input type="password" autoComplete={register?"new-password":"current-password"} required minLength={register?10:1} maxLength={72} value={password} onChange={e=>setPassword(e.target.value)}/></label><button className="primary wide" disabled={busy}>{busy?<Spinner/>:null}{register?"Create account":"Sign in"}<ArrowRight size={17}/></button></form><button className="text-button" onClick={()=>{setRegister(!register);setError("")}}>{register?"Already have an account? Sign in":"New here? Create a programmer account"}</button><div className="auth-note"><ShieldCheck size={19}/><span>Your role determines your workspace. Team and project access is assigned by the administrator.</span></div></div></section></main>;
- return <div className="shell"><aside className="sidebar"><Brand/><div className="workspace"><span className="workspace-avatar">I</span><div><strong>Documentation lab</strong><small>{user.role} workspace</small></div></div><span className="nav-heading">WORKSPACE</span><nav>{nav.map(({label,icon:Icon})=><button key={label} className={!selected&&view===label?"nav active":"nav"} onClick={()=>{setView(label);setSelected(null);setSearch("");setError("")}}><Icon size={18}/>{label}{label==="Scan history"&&scans.length>0&&<span className="nav-count">{scans.length}</span>}</button>)}</nav><div className="sidebar-bottom"><div className="engine"><span className="dot"/>Deterministic by design<small>AI assistance, only when you ask.</small></div><div className="profile"><span className="avatar">{user.name.split(" ").map(x=>x[0]).slice(0,2).join("")}</span><div><strong>{user.name}</strong><small>{user.role}</small></div><button className="icon-button" onClick={logout} aria-label="Sign out"><LogOut size={17}/></button></div></div></aside>
- <div className="main"><header className="topbar"><div className="breadcrumb">Workspace <ChevronRight size={14}/><strong>{selected?"Scan results":view}</strong></div><div className="topbar-right"><Badge tone="green"><span className="dot"/>Python analysis</Badge><span className="avatar small">{user.name[0]}</span></div></header>
- <main className="content">{error&&<div role="alert" className="error"><AlertTriangle size={18}/>{error}<button aria-label="Dismiss error" onClick={()=>setError("")}><X size={16}/></button></div>}{notice&&<div role="status" className="notice"><Check size={18}/>{notice}</div>}
- <div className="page-title"><div>{selected?<button className="back" onClick={()=>setSelected(null)}><ArrowLeft size={14}/>Back to workspace</button>:<span className="eyebrow">{programmer?"YOUR DOCUMENTATION, IN FOCUS":"A SHARED VIEW OF DOCUMENTATION HEALTH"}</span>}<h1>{selected?cbName(selected.codebase_id):view==="Overview"?"Documentation overview":view}</h1><p>{selected?<>Scan {selected.scan_id.slice(0,8)} · {date(selected.timestamp)} <Badge tone={selected.status==="Completed"?"green":"amber"}>{selected.status}</Badge></>:view==="Overview"?"Understand what changed. Know what needs attention.":view==="Codebases"?"Your source code, organized and ready for analysis.":view==="Scan history"?"A record of every scan and the findings behind each score.":view==="Team insights"?"Compare documentation health within your authorized scope.":"Every score should tell you how it was calculated."}</p></div>{selected?<button className="secondary" onClick={download}><ArrowDownToLine size={16}/>Export report</button>:programmer&&<button className="primary" onClick={()=>{setUpload(true);setError("");setBaseId(codebases[0]?.codebase_id||"")}}><Plus size={18}/>New scan</button>}</div>
- {busy&&!upload&&<div className="loading-bar"><Spinner/>Loading workspace…</div>}
- {selected?<><div className="stats"><Stat label="Documentation reliability" value={number(summary?.documentation_score)} suffix="/ 100" icon={<ShieldCheck/>} accent/><Stat label="Functions analyzed" value={summary?.total_functions||0} sub={summary?.documented_functions+" documented"} icon={<Code2/>}/><Stat label="Findings to review" value={summary?.total_findings||0} sub="Deterministic findings" icon={<AlertTriangle/>}/><Stat label="Files processed" value={summary?.parsed_files||0} sub={(summary?.failed_files||0)+" files with errors"} icon={<FileCode2/>}/></div>
- {summary?.error&&<div className="error">{summary.error}</div>}
- <section className="panel"><div className="tabs">{["Findings","Files","Score breakdown"].map(t=><button className={tab===t?"chosen":""} onClick={()=>setTab(t)} key={t}>{t}{t==="Findings"&&<span>{findingsCount}</span>}</button>)}</div>
- {tab==="Findings"?<><div className="toolbar"><div className="search"><Search size={17}/><input aria-label="Search functions" placeholder="Search functions or files…" value={search} onChange={e=>setSearch(e.target.value)}/></div><div className="filter"><SlidersHorizontal size={15}/><select aria-label="Filter functions" value={filter} onChange={e=>setFilter(e.target.value)}>{["All functions","With findings","Undocumented","Clean"].map(f=><option key={f}>{f}</option>)}</select></div></div>{filtered.length?<div className="table-wrap"><table><thead><tr><th>FUNCTION / LOCATION</th><th>DOCUMENTATION</th><th>FINDINGS</th><th>REVIEW</th></tr></thead><tbody>{filtered.map(f=><tr key={f.function_id}><td><button className="function-name" onClick={()=>openFunction(f)}>{f.qualified_name||f.name}<ChevronRight size={13}/></button><small className="mono">{f.file_path}:{f.line_number}</small></td><td><Badge tone={f.has_docstring?"green":"amber"}>{f.has_docstring?"Documented":"Missing docstring"}</Badge></td><td>{f.findings.length?<span className="finding-count">{f.findings.length} {f.findings.length===1?"finding":"findings"}</span>:<span className="clean"><Check size={14}/>No findings</span>}</td><td><button className="text-button compact" onClick={()=>openFunction(f)}>Inspect<ArrowRight size={14}/></button></td></tr>)}</tbody></table></div>:<Empty title={functions.length?"No matching functions":"No functions to display"} text={functions.length?"Try another search or filter.":"Check the Files tab for parsing errors or upload code containing functions."}/>}</>:tab==="Files"?<div className="file-list">{files.map(f=><div key={f.file_id}><FileCode2 size={19}/><div><strong className="mono">{f.path}</strong>{f.error_message&&<p className="error-text">{f.error_message}</p>}</div><Badge tone={f.parse_status==="Parsed"?"green":"red"}>{f.parse_status}</Badge></div>)}</div>:<ScoreGuide breakdown={summary?.breakdown}/>}</section></>:
- view==="Scoring guide"?<section className="panel"><ScoreGuide/></section>:
- view==="Codebases"?codebases.length?<div className="codebase-grid">{codebases.map(c=>{const last=scans.find(s=>s.codebase_id===c.codebase_id);return <section className="panel codebase-card" key={c.codebase_id}><span className="folder-icon"><FolderGit2 size={24}/></span><h3>{c.name}</h3><p>{c.project_id?"Linked to a project":"Personal codebase"}</p><div className="codebase-score"><span>Latest reliability</span><strong>{number(last?.summary?.documentation_score)}<small> / 100</small></strong></div><div className="card-actions">{last?<button className="secondary" onClick={()=>openScan(last)}>View latest scan<ArrowRight size={14}/></button>:<span className="muted">No scans yet</span>}{programmer&&<button className="icon-button" aria-label={"Scan "+c.name} onClick={()=>{setBaseId(c.codebase_id);setUpload(true)}}><Plus size={20}/></button>}</div></section>})}</div>:<section className="panel"><Empty title="Your first codebase starts here" text="Choose New scan to register a codebase and upload its Python files."/></section>:
- <>{view==="Overview"&&<><div className="stats"><Stat label={programmer?"Latest reliability":"Weighted reliability"} value={number(currentScore)} suffix="/ 100" icon={<ShieldCheck/>} accent/><Stat label="Codebases" value={codebases.length} sub="Within your workspace" icon={<FolderGit2/>}/><Stat label="Recent scans" value={scans.length} sub="Latest 50 scans loaded" icon={<Activity/>}/><Stat label={programmer?"Latest scan findings":"People / teams"} value={programmer?latest?.summary?.total_findings||0:(metrics.ranked_programmers||metrics.ranked_teams||[]).length} sub={programmer?"Ready for your review":"Within your authorized scope"} icon={programmer?<AlertTriangle/>:<Users/>}/></div><div className="overview-grid"><section className="panel trend"><div className="panel-heading"><div><h3>Reliability over time</h3><p>Recent scan scores · 0–100</p></div><Badge>Last 10 scans</Badge></div><Trend scans={scans}/></section><section className="insight"><span className="insight-icon"><BookOpen size={21}/></span><span className="eyebrow">LESS GUESSWORK. MORE CLARITY.</span><h2>Documentation that<br/>keeps its promise.</h2><p>IntelliDoc compares Python signatures with Google-style docstrings and explains every mismatch.</p><button onClick={()=>setView("Scoring guide")}>See how scoring works<ArrowRight size={16}/></button></section></div></>}
- {!programmer&&(view==="Team insights"||view==="Overview")&&<section className="panel rankings"><div className="panel-heading"><div><h3>{metrics.team_name||metrics.project_name||"Team insights"}</h3><p>Function-weighted scores from the latest scan of each codebase</p></div><Badge>Authorized scope</Badge></div>{(metrics.ranked_programmers||metrics.ranked_teams||[]).length?<div className="table-wrap"><table><thead><tr><th>RANK</th><th>{user.role==="Team Lead"?"PROGRAMMER":"TEAM"}</th><th>FUNCTIONS</th><th>RELIABILITY</th></tr></thead><tbody>{(metrics.ranked_programmers||metrics.ranked_teams||[]).map((r,i)=><tr key={r.email||r.team_name}><td><span className="rank">{i+1}</span></td><td><strong>{r.name||r.team_name}</strong><small>{r.email||r.programmers_count+" programmers"}</small></td><td>{r.functions_count}</td><td><ScorePill value={r.latest_score===undefined?r.average_score:r.latest_score}/></td></tr>)}</tbody></table></div>:<Empty title="No team metrics yet" text="Assigned codebases and completed scans will appear here."/>}</section>}
- {view!=="Team insights"&&<section className="panel"><div className="panel-heading"><div><h3>{view==="Overview"?"Recent activity":"Scan history"}</h3><p>{view==="Overview"?"Your latest scans, with the details that matter.":"Select a scan to inspect its files, functions, and findings."}</p></div>{view==="Overview"&&<button className="text-button compact" onClick={()=>setView("Scan history")}>View all history<ArrowRight size={15}/></button>}</div>{scans.length?<div className="table-wrap"><table><thead><tr><th>CODEBASE</th><th>SCANNED</th><th>STATUS</th><th>RELIABILITY</th><th>FINDINGS</th><th></th></tr></thead><tbody>{(view==="Overview"?scans.slice(0,5):scans).map(s=><tr key={s.scan_id}><td><button className="table-link" onClick={()=>openScan(s)}><FileCode2 size={18}/>{cbName(s.codebase_id)}</button><small className="scan-id">{s.scan_id.slice(0,8)} · {s.summary?.total_files||0} files</small></td><td className="muted">{date(s.timestamp)}</td><td><Badge tone={s.status==="Completed"?"green":s.status==="Failed"?"red":"amber"}>{s.status}</Badge></td><td><ScorePill value={s.summary?.documentation_score}/></td><td>{s.summary?.total_findings??"—"}</td><td><button className="icon-button" aria-label={"Open scan "+s.scan_id.slice(0,8)} onClick={()=>openScan(s)}><ArrowRight size={17}/></button></td></tr>)}</tbody></table></div>:<Empty title="A fresh start for your documentation" text={programmer?"Run your first scan to see reliability scores and actionable findings.":"Scans from your assigned teams will appear here."}/>}
- {view==="Scan history"&&<div className="pagination"><button className="secondary" disabled={busy||offset===0} onClick={async()=>{setBusy(true);try{const n=Math.max(0,offset-50);setScans(await api<Scan[]>("/scans?limit=50&offset="+n));setOffset(n)}catch(e){setError(message(e))}finally{setBusy(false)}}}>Previous</button><span>Page {offset/50+1}</span><button className="secondary" disabled={busy||scans.length<50} onClick={async()=>{setBusy(true);try{const n=offset+50;setScans(await api<Scan[]>("/scans?limit=50&offset="+n));setOffset(n)}catch(e){setError(message(e))}finally{setBusy(false)}}}>Next</button></div>}</section>}</>}
- <footer>IntelliDoc <span>Documentation reliability is one signal, not a measure of programming ability.</span><span>AST-powered · Python</span></footer>
- </main></div>
- {upload&&<div className="overlay" onClick={()=>{if(!busy)setUpload(false)}}><section className="modal" role="dialog" aria-modal="true" aria-labelledby="upload-title" onClick={e=>e.stopPropagation()}><button className="modal-close icon-button" aria-label="Close upload" disabled={busy} onClick={()=>setUpload(false)}><X/></button><span className="folder-icon"><UploadCloud size={26}/></span><h2 id="upload-title">A clearer view of your code.</h2><p>Upload a ZIP of your Python project. Your code is parsed, never executed.</p>{error&&<div className="error" role="alert">{error}</div>}<form onSubmit={scan}><label>Codebase<select value={baseId} onChange={e=>setBaseId(e.target.value)} disabled={busy}><option value="">Create a new codebase</option>{codebases.map(c=><option key={c.codebase_id} value={c.codebase_id}>{c.name}</option>)}</select></label>{!baseId&&<label>Codebase name<input autoFocus required maxLength={150} placeholder="e.g. Student management API" value={newName} onChange={e=>setNewName(e.target.value)} disabled={busy}/></label>}<label className="dropzone" onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();if(!busy)setFile(e.dataTransfer.files[0]||null)}}><UploadCloud size={30}/><strong>{file?file.name:"Choose a ZIP file or drop it here"}</strong><span>{file?(file.size/1024).toFixed(0)+" KB":"Up to 10 MB · Python source files"}</span><input ref={fileRef} type="file" accept=".zip,application/zip" disabled={busy} onChange={e=>setFile(e.target.files?.[0]||null)}/></label><div className="info"><ShieldCheck size={17}/><span>AI is never called during a scan. Source is stored privately for your review and optional AI requests.</span></div><button className="primary wide" disabled={busy||!file||(!baseId&&!newName.trim())}>{busy?<Spinner/>:<Activity size={17}/>} {busy?"Analyzing your project…":"Run analysis"}</button></form></section></div>}
- {active&&<div className="overlay drawer-overlay" onClick={()=>{if(!aiBusy)setActive(null)}}><section className="drawer" role="dialog" aria-modal="true" aria-labelledby="function-title" onClick={e=>e.stopPropagation()}><div className="drawer-heading"><Badge>FUNCTION DETAIL</Badge><button className="icon-button" disabled={aiBusy} aria-label="Close function details" onClick={()=>setActive(null)}><X/></button></div><h2 id="function-title">{active.qualified_name||active.name}</h2><p className="mono muted">{active.file_path}:{active.line_number}</p><h4>SOURCE SNAPSHOT</h4><pre className="source">{active.source_code||active.signature}</pre><h4>DETERMINISTIC FINDINGS <span>{active.findings.length}</span></h4>{active.findings.length?active.findings.map(f=><div className="finding" key={f.finding_id}><div><Badge tone={f.severity==="High"?"red":f.severity==="Medium"?"amber":""}>{f.severity}</Badge><strong>{f.type}</strong></div><p>{f.explanation}</p></div>):<div className="notice"><Check size={16}/>No structural mismatches detected by supported rules.</div>}
- <section className="ai-section"><div className="panel-heading"><h3><Sparkles size={18}/>AI assistance</h3><Badge>ADVISORY</Badge></div><p>On request, the selected function is sent to {active.has_docstring?"Gemini":"Groq"}. Review the response before using it. AI never changes your deterministic score.</p>{programmer&&<button className="secondary" disabled={aiBusy} onClick={()=>runAI(active.has_docstring?"consistency-check":"generate-doc")}>{aiBusy?<Spinner/>:<Sparkles size={16}/>} {active.has_docstring?"Check logical consistency":"Generate documentation draft"}</button>}
- {analyses.map(a=><article className="analysis" key={a.analysis_id}><div><strong>{a.analysis_type}</strong><Badge tone={a.status==="Failed"?"red":"green"}>{a.status}</Badge></div><small>{a.provider} · {a.review_status}</small>{a.analysis_type==="Draft Generation"&&a.status==="Completed"&&a===analyses.filter(x=>x.analysis_type==="Draft Generation"&&x.status==="Completed").at(-1)?<><label>Edit draft<textarea rows={10} value={draft} onChange={e=>setDraft(e.target.value)} readOnly={!programmer}/></label>{programmer&&<div className="card-actions"><button className="primary" disabled={aiBusy||!draft.trim()} onClick={()=>review(a,"Accepted")}><Check size={15}/>Accept draft</button><button className="secondary" disabled={aiBusy} onClick={()=>review(a,"Rejected")}>Reject</button><button className="text-button" onClick={async()=>{try{await navigator.clipboard.writeText(draft);setNotice("Draft copied")}catch{setError("Clipboard unavailable. Select and copy the draft manually.")}}}>Copy</button></div>}<p className="muted">Acceptance saves your review. Apply the draft to your source, then upload a new scan.</p></>:<pre className={a.status==="Failed"?"ai-error":"ai-output"}>{a.result}</pre>}</article>)}</section></section></div>}
- </div>
-}
-function Stat({label,value,suffix,sub,icon,accent}:{label:string;value:string|number;suffix?:string;sub?:string;icon:React.ReactNode;accent?:boolean}){return <section className={"stat "+(accent?"accent":"")}><div><span>{label}</span><span className="stat-icon">{icon}</span></div><strong>{value}<small>{suffix}</small></strong><p>{sub||(value==="N/A"?"Awaiting an applicable scan":"Documentation reliability score")}</p></section>}
-function ScorePill({value}:{value:number|null|undefined}){return <span className={"score-pill "+(value==null?"neutral":value>=80?"good":value>=50?"okay":"poor")}>{number(value)}<small>{value!=null?"/ 100":""}</small></span>}
-function Trend({scans}:{scans:Scan[]}){
- const values=scans.filter(s=>s.summary?.documentation_score!=null).slice(0,10).reverse();
- if(!values.length)return <Empty title="Your progress starts with a scan" text="Scores will appear here as you analyze your projects."/>;
- const points=values.map((s,i)=>`${values.length===1?250:45+i*445/(values.length-1)},${155-(s.summary!.documentation_score||0)*1.25}`);
- return <div className="chart"><svg viewBox="0 0 530 200" role="img" aria-label={"Recent scan reliability scores: "+values.map(s=>s.summary!.documentation_score).join(", ")}>{[0,50,100].map(v=><g key={v}><text x="5" y={160-v*1.25}>{v}</text><line x1="40" x2="510" y1={155-v*1.25} y2={155-v*1.25}/></g>)}{values.length>1&&<><polygon points={points[0].split(",")[0]+",155 "+points.join(" ")+" "+points.at(-1)!.split(",")[0]+",155"} fill="url(#area)"/><polyline points={points.join(" ")} fill="none" stroke="#198575" strokeWidth="3"/></>}{points.map((p,i)=><circle key={i} cx={p.split(",")[0]} cy={p.split(",")[1]} r="4.5" fill="#198575" stroke="white" strokeWidth="2"><title>{date(values[i].timestamp)}: {values[i].summary!.documentation_score}</title></circle>)}<defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#198575" stopOpacity=".18"/><stop offset="100%" stopColor="#198575" stopOpacity=".01"/></linearGradient></defs><text x="40" y="190">Earlier scans</text><text x="440" y="190">Latest scan</text></svg></div>
-}
-function ScoreGuide({breakdown}:{breakdown?:Record<string,number|string>}){
- return <div className="score-guide"><span className="eyebrow">EXPLAINABLE BY DESIGN</span><h2>What goes into a reliability score?</h2><p>A proposed academic scoring policy, based on deterministic documentation checks. AI opinions are always separate.</p><div className="score-components">{[["Completeness","40","completeness_score","The fraction of functions with a non-empty docstring."],["Parameter consistency","40","parameter_consistency","Missing or obsolete parameter documentation reduces this component."],["Return consistency","20","return_consistency","Missing return or yield documentation reduces this component."]].map(([label,max,key,desc])=><div key={key}><span>{label}</span><strong>{breakdown&&typeof breakdown[key]==="number"?number(breakdown[key] as number):max}<small> / {max}</small></strong><p>{desc}</p></div>)}</div><h3>The calculation</h3><p>Completeness = 40 × documented / total. Each consistency component starts at its maximum, loses 4, 2, or 1 point per high, medium, or low finding, is bounded at zero, and is multiplied by the documented fraction. Missing docstrings reduce completeness and the available consistency points; they do not receive a second penalty.</p><p>No functions means <strong>not applicable</strong>, rather than a perfect score. Team and project scores use the function-weighted mean of the latest scan per codebase within their authorized scope. Empty scans contribute no weight.</p><div className="info"><BookOpen size={20}/><span>Supported scope: Python signatures and Google-style docstrings. Structural checks cannot prove runtime behavior, return types, or overall code quality. Penalties are proposed weights, not scientifically validated measurements.</span></div></div>
+export default function Home() {
+  const [user, setUser] = useState<User | null>(null);
+  const [booting, setBooting] = useState(true);
+  useEffect(() => {
+    api<User>("/auth/me").then(setUser).catch(() => {}).finally(() => setBooting(false));
+    function expired() { setUser(null); }
+    window.addEventListener("session-expired", expired);
+    return () => window.removeEventListener("session-expired", expired);
+  }, []);
+  if (booting) return <main className="boot" role="status">Opening IntelliDoc…</main>;
+  if (!user) return <SignIn onSignedIn={setUser} />;
+  return <Workspace key={user.user_id} user={user} onSignedOut={() => setUser(null)} />;
 }
 
+function Workspace({ user, onSignedOut }: { user: User; onSignedOut: () => void }) {
+  const programmer = user.role === "Programmer";
+  const projectLead = user.role === "Project Lead";
+  const setupView = projectLead ? "Projects" : "Teams";
+  const [view, setView] = useState(programmer ? "Memberships" : setupView);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [scopeId, setScopeId] = useState("");
+  const [organizationLoading, setOrganizationLoading] = useState(!programmer);
+  const [scans, setScans] = useState<Scan[]>([]);
+  const [codebases, setCodebases] = useState<Codebase[]>([]);
+  const [metrics, setMetrics] = useState<Metrics>({});
+  const [selected, setSelected] = useState<Scan | null>(null);
+  const [upload, setUpload] = useState(false);
+  const [uploadBase, setUploadBase] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [moreLoading, setMoreLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [refresh, setRefresh] = useState(0);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [search, setSearch] = useState("");
+  const moreRequest = useRef<AbortController | null>(null);
+  const reload = useCallback(() => setRefresh(value => value + 1), []);
+  const filterQuery = !programmer && scopeId ? `${projectLead ? "project_id" : "team_id"}=${scopeId}` : "";
+
+  useEffect(() => {
+    if (programmer) return;
+    const controller = new AbortController();
+    setOrganizationLoading(true);
+    const endpoint = projectLead ? "/projects?owned=true" : "/teams?owned=true";
+    api<(Project | Team)[]>(endpoint, { signal: controller.signal }).then(records => {
+      if (projectLead) setProjects(records as Project[]);
+      else setTeams(records as Team[]);
+      const ids = records.map(record => "team_id" in record ? record.team_id : record.project_id);
+      setScopeId(previous => ids.includes(previous) ? previous : ids[0] || "");
+    }).catch(exception => { if (!controller.signal.aborted) setError(exception.message); })
+      .finally(() => { if (!controller.signal.aborted) setOrganizationLoading(false); });
+    return () => controller.abort();
+  }, [programmer, projectLead, refresh]);
+
+  useEffect(() => {
+    moreRequest.current?.abort();
+    setMoreLoading(false);
+    if (!programmer && !scopeId) {
+      setScans([]); setCodebases([]); setMetrics({}); setHasMore(false);
+      return;
+    }
+    const controller = new AbortController();
+    setLoading(true); setError("");
+    const metricsPath = programmer ? "/scores/me" : projectLead ? `/project/scores?project_id=${scopeId}` : `/team/scores?team_id=${scopeId}`;
+    Promise.all([
+      api<Scan[]>(`/scans?limit=50&${filterQuery}`, { signal: controller.signal }),
+      api<Codebase[]>(`/codebases?${filterQuery}`, { signal: controller.signal }),
+      api<Metrics>(metricsPath, { signal: controller.signal }),
+    ]).then(([foundScans, foundCodebases, foundMetrics]) => {
+      setScans(foundScans); setCodebases(foundCodebases); setMetrics(foundMetrics);
+      setHasMore(foundScans.length === 50);
+    }).catch(exception => { if (!controller.signal.aborted) setError(exception.message); })
+      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
+    return () => { controller.abort(); moreRequest.current?.abort(); };
+  }, [programmer, projectLead, scopeId, filterQuery, refresh]);
+
+  async function logout() {
+    try { await api("/auth/logout", { method: "POST" }); onSignedOut(); }
+    catch (exception) { setError(exception instanceof Error ? exception.message : "Unable to sign out"); }
+  }
+
+  async function loadMore() {
+    moreRequest.current?.abort();
+    const controller = new AbortController();
+    moreRequest.current = controller;
+    setMoreLoading(true);
+    try {
+      const records = await api<Scan[]>(`/scans?limit=50&offset=${scans.length}&${filterQuery}`, { signal: controller.signal });
+      setScans(previous => [...previous, ...records.filter(record => !previous.some(scan => scan.scan_id === record.scan_id))]);
+      setHasMore(records.length === 50);
+    } catch (exception) { if (!controller.signal.aborted) setError(exception instanceof Error ? exception.message : "Unable to load scans"); }
+    finally { if (!controller.signal.aborted) setMoreLoading(false); }
+  }
+
+  function navigate(destination: string) {
+    setView(destination); setSelected(null); setSearch(""); setError(""); setNotice("");
+  }
+  function newScan(codebaseId = "") {
+    setUploadBase(codebaseId); setUpload(true); setError("");
+  }
+
+  const navigation = [...(programmer ? ["Memberships"] : projectLead ? [setupView] : [setupView, "Project access"]), "Scans", "Codebases", ...(!programmer ? ["Results"] : []), "Scoring"];
+  const nameOf = (id: string) => codebases.find(codebase => codebase.codebase_id === id)?.name || "Codebase";
+  const selectedScore = programmer ? metrics.latest_score : projectLead ? metrics.average_project_score : metrics.average_documentation_score;
+  const visibleScans = scans.filter(scan => nameOf(scan.codebase_id).toLowerCase().includes(search.toLowerCase()));
+  const hasAssignment = programmer || !!scopeId;
+
+  return <div className="app-shell">
+    <header className="app-header">
+      <a href="/" className="wordmark" onClick={event => { event.preventDefault(); navigate(programmer ? "Scans" : setupView); }}>IntelliDoc</a>
+      <div className="account"><div><strong>{user.name}</strong><span>{user.role}</span></div>
+        <button className="icon-button" aria-label="Sign out" onClick={logout}><LogOut size={18} /></button></div>
+    </header>
+    <nav className="main-nav" aria-label="Main navigation">{navigation.map(item => <button key={item}
+      aria-current={!selected && view === item ? "page" : undefined} onClick={() => navigate(item)}>{item}</button>)}</nav>
+    <main className="workspace-content">
+      {error && <div className="error" role="alert">{error}</div>}
+      {notice && <div className="notice" role="status">{notice}</div>}
+      {selected ? <ScanResults key={selected.scan_id} scan={selected} codebase={codebases.find(codebase => codebase.codebase_id === selected.codebase_id)}
+        canWrite={programmer} onBack={() => setSelected(null)} /> : <>
+        <div className="page-heading"><div><h1>{view === "Scans" ? "Scan history" : view}</h1>
+          <p>{view === setupView ? (projectLead ? "Create projects and share their IDs with your Team Leads." : "Create teams within existing projects. Share the team and project IDs with your programmers.")
+            : view === "Scans" ? "Open a submission to review its source, findings and documentation score."
+            : view === "Codebases" ? "Each codebase keeps its selected project and team across scans."
+            : view === "Results" ? "Review team and programmer documentation results within the selected assignment."
+            : view === "Memberships" ? "Request access by project/team name or ID. Once approved, open Scans to upload."
+            : view === "Project access" ? "Request permission from the Project Lead before creating teams." : "How documentation scores are calculated."}</p></div>
+          {programmer && ["Scans","Codebases"].includes(view) && <button className="primary" onClick={() => newScan()}><Plus size={17} />New scan</button>}
+        </div>
+        {!programmer && view !== setupView && view !== "Scoring" && view !== "Project access" && <div className="scope-bar"><label>{projectLead ? "Project" : "Team"}
+          <select aria-label={`Review ${projectLead ? "project" : "team"}`} value={scopeId} onChange={event => { setScopeId(event.target.value); setSearch(""); }} disabled={organizationLoading}>
+            {!scopeId && <option value="">{organizationLoading ? "Loading…" : `Create a ${projectLead ? "project" : "team"} first`}</option>}
+            {projectLead ? projects.map(project => <option key={project.project_id} value={project.project_id}>{project.project_name}</option>)
+              : teams.map(team => <option key={team.team_id} value={team.team_id}>{team.team_name} · {team.project_name || "Legacy assignment"}</option>)}
+          </select></label><button className="icon-button" onClick={reload} aria-label="Refresh results" disabled={loading}><RefreshCw size={17} /></button></div>}
+        {!programmer && view === setupView ? <><Organization user={user} projects={projects} teams={teams} onRefresh={reload}
+          onInspect={id => { setScopeId(id); navigate("Results"); }} />
+          <MembershipAccess user={user} mode={projectLead?"project-approvals":"team-approvals"} refresh={refresh} onRefresh={reload}/>
+          {projectLead&&<MembershipAccess user={user} mode="project-roster" refresh={refresh} onRefresh={reload}/>}</>
+          : view === "Memberships" || view === "Project access" ? <MembershipAccess user={user} mode={programmer?"team-request":"project-request"} refresh={refresh} onRefresh={reload}/>
+          : view === "Scoring" ? <ScoringGuide />
+          : !hasAssignment ? <div className="empty"><h2>{projectLead ? "Create a project to begin" : "Create a team to begin"}</h2>
+            <p>{projectLead ? "Your teams and their submissions will be grouped under the project." : "Your programmers will select your team when they upload code."}</p>
+            <button onClick={() => navigate(setupView)}>Open {setupView.toLowerCase()}</button></div>
+          : <>
+            {loading && <p role="status" className="loading">Loading submissions…</p>}
+            {view === "Codebases" ? <div className="table-scroll"><table><thead><tr><th>Codebase</th><th>Project</th><th>Team</th><th>Actions</th></tr></thead>
+              <tbody>{codebases.map(codebase => {
+                const latest = scans.find(scan => scan.codebase_id === codebase.codebase_id);
+                return <tr key={codebase.codebase_id}><td className="strong">{codebase.name}</td><td>{codebase.project_name || "Unassigned"}</td>
+                  <td>{codebase.team_name || "Legacy assignment"}</td><td className="row-actions">
+                    {latest && <button className="link-button" onClick={() => setSelected(latest)}>Latest scan</button>}
+                    {programmer && <button className="link-button" onClick={() => newScan(codebase.codebase_id)}>Rescan</button>}
+                  </td></tr>;
+              })}</tbody></table>{!loading && !codebases.length && <p className="empty">No codebases yet.</p>}</div> : <>
+              <div className="result-summary"><span>{programmer ? "Latest score" : "Function-weighted score"} <strong>{scoreText(selectedScore)}<small> / 100</small></strong></span>
+                <span>{codebases.length} codebases</span><span>{scans.length}{hasMore ? "+" : ""} scans loaded</span></div>
+              {view === "Results" && <section className="table-section"><h2>{projectLead ? "Teams" : "Programmers"}</h2>
+                <div className="table-scroll"><table><thead><tr><th>{projectLead ? "Team" : "Programmer"}</th><th>Functions</th><th>Documentation score</th></tr></thead><tbody>
+                  {((projectLead?metrics.ranked_teams:metrics.ranked_programmers) || []).map((row, index) => <tr key={row.email || row.team_name || index}>
+                    <td className="strong">{row.name || row.team_name}</td><td>{row.functions_count}</td><td>{scoreText(row.latest_score === undefined ? row.average_score : row.latest_score)}</td>
+                  </tr>)}
+                </tbody></table></div>
+                {!((projectLead?metrics.ranked_teams:metrics.ranked_programmers) || []).length && <p className="empty">Results will appear when programmers join or submit to this assignment.</p>}
+              </section>}
+              {view === "Results" && projectLead && <section className="table-section"><h2>Programmers across this project</h2>
+                <div className="table-scroll"><table><thead><tr><th>Programmer</th><th>Teams</th><th>Functions</th><th>Documentation score</th></tr></thead><tbody>
+                  {(metrics.ranked_programmers||[]).map((row,index)=><tr key={row.email||index}><td className="strong">{row.name}<small className="table-note">{row.email}</small></td>
+                    <td>{row.teams?.map(team=>team.team_name).join(", ")||"—"}</td><td>{row.functions_count}</td><td>{scoreText(row.latest_score)}</td></tr>)}
+                </tbody></table></div><p className="field-note">Approved programmers without scored submissions show N/A. Scores measure supported documentation checks.</p>
+              </section>}
+              <section className="table-section"><div className="table-tools"><h2>Submissions</h2>
+                <label className="search-field"><span className="sr-only">Find codebase</span><input type="search" placeholder="Find codebase" value={search} onChange={event => setSearch(event.target.value)} /></label></div>
+                <div className="table-scroll"><table><thead><tr><th>Codebase</th><th>Submitted</th><th>Status</th><th>Score</th><th>Findings</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>
+                  {visibleScans.map(scan => <tr key={scan.scan_id}><td><button className="link-button strong" onClick={() => setSelected(scan)}>{nameOf(scan.codebase_id)}</button>
+                    <small className="table-note mono">{scan.scan_id.slice(0, 8)}</small></td><td>{dateText(scan.timestamp)}</td><td><Status value={scan.status} /></td>
+                    <td>{scoreText(scan.summary?.documentation_score)}</td><td>{scan.summary?.total_findings ?? "—"}</td>
+                    <td><button className="link-button" onClick={() => setSelected(scan)}>Open</button></td></tr>)}
+                </tbody></table></div>
+                {!loading && !visibleScans.length && <p className="empty">{search ? "No matching submissions." : programmer
+                  ? "No scans yet. Select a project and team through New scan to upload your source."
+                  : "No submissions for this assignment yet. Share its ID with the people submitting code."}</p>}
+                {hasMore && <div className="pagination"><button disabled={loading || moreLoading} onClick={loadMore}>{moreLoading ? "Loading…" : "Load older scans"}</button></div>}
+              </section>
+              {!!scans.length && <details className="trend-details"><summary>Recent scan scores</summary><Trend scans={scans} /></details>}
+            </>}
+          </>}
+      </>}
+    </main>
+    <footer className="app-footer">IntelliDoc<span>Python functions and Google-style docstrings</span></footer>
+    {upload && <UploadScan codebases={codebases} initialCodebase={uploadBase} onClose={() => { setUpload(false); reload(); }}
+      onComplete={scan => { setUpload(false); setView("Scans"); setSelected(scan); setNotice("Scan saved."); reload(); }} />}
+  </div>;
+}
+
+function Trend({ scans }: { scans: Scan[] }) {
+  const values = scans.filter(scan => scan.summary?.documentation_score != null).slice(0, 10).reverse();
+  if (!values.length) return <p className="empty">No numeric scores yet.</p>;
+  const points = values.map((scan, index) => ({
+    x: values.length === 1 ? 300 : 50 + index * 500 / (values.length - 1),
+    y: 160 - (scan.summary?.documentation_score || 0) * 1.3,
+    scan,
+  }));
+  return <div className="trend"><p className="field-note">Latest 10 scored scans in this view. Select the same codebase for like-for-like comparison.</p>
+    <svg viewBox="0 0 600 200" role="img" aria-label={`Recent documentation scores: ${values.map(scan => scan.summary?.documentation_score).join(", ")}`}>
+      {[0, 50, 100].map(value => <g key={value}><text x="8" y={165 - value * 1.3}>{value}</text><line x1="40" x2="570" y1={160 - value * 1.3} y2={160 - value * 1.3} /></g>)}
+      {points.length > 1 && <polyline points={points.map(point => `${point.x},${point.y}`).join(" ")} />}
+      {points.map(point => <circle key={point.scan.scan_id} cx={point.x} cy={point.y} r="4"><title>{dateText(point.scan.timestamp)} · {scoreText(point.scan.summary?.documentation_score)}</title></circle>)}
+      <text x="40" y="190">Earlier</text><text x="520" y="190">Latest</text>
+    </svg>
+  </div>;
+}

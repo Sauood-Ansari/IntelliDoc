@@ -22,7 +22,7 @@ class AIAnalysis(Base):
 
     analysis_id = Column(Uuid, primary_key=True, default=uuid.uuid4)
     function_id = Column(Uuid, ForeignKey("functions.function_id"), nullable=False)
-    provider = Column(String(50), default="Groq", nullable=False)  # SRS: Groq (Llama 3.3 70B)
+    provider = Column(String(50), default="Groq", nullable=False)
     analysis_type = Column(SAEnum(AIAnalysisType, native_enum=False), nullable=False)
     result = Column(Text, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)

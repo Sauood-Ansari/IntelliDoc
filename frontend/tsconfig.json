@@ -35,7 +35,9 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     ".production/types/**/*.ts",
-    ".production/dev/types/**/*.ts"
+    ".production/dev/types/**/*.ts",
+    ".audit-production-20261113/types/**/*.ts",
+    ".audit-production-20261113/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

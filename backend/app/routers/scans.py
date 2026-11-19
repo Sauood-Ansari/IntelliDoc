@@ -9,22 +9,29 @@ from app.schemas.function import FunctionDetailOut, FindingOut
 from app.dependencies import get_current_user, allow_programmer
 from app.services.scan_service import ScanService
 from app.config import settings
-from app.access import scans_for, require_scan
+from app.access import scans_for, require_scan, require_assignment, codebases_for, codebases_in_team
 
 router = APIRouter(prefix="/scans", tags=["Scans"])
 
 @router.post("", response_model=ScanOut, status_code=201)
 async def start_scan(codebase_id: UUID = Form(...), file: UploadFile = File(...),
+                     project_id: UUID = Form(...), team_id: UUID = Form(...),
                      user=Depends(allow_programmer), db: Session = Depends(get_db)):
     codebase = db.get(Codebase, codebase_id)
     if not codebase or codebase.owner_id != user.user_id:
         raise HTTPException(404, "Codebase not found")
+    require_assignment(db, project_id, team_id, user)
+    if ((codebase.project_id is not None and codebase.project_id != project_id)
+            or (codebase.team_id is not None and codebase.team_id != team_id)):
+        raise HTTPException(409, "This codebase belongs to another project or team. Create a new codebase for that assignment.")
     if not file.filename or not file.filename.lower().endswith(".zip"):
         raise HTTPException(400, "Upload a ZIP archive containing Python files")
     content = await file.read(settings.MAX_SOURCE_SIZE + 1)
     await file.close()
     if len(content) > settings.MAX_SOURCE_SIZE:
         raise HTTPException(413, "ZIP upload exceeds 10 MB")
+    # Legacy codebases receive their first explicit assignment on upload.
+    codebase.project_id, codebase.team_id = project_id, team_id
     scan = Scan(codebase_id=codebase_id, initiated_by=user.user_id, status=ScanStatus.RUNNING)
     db.add(scan)
     db.commit()
@@ -46,8 +53,16 @@ async def start_scan(codebase_id: UUID = Form(...), file: UploadFile = File(...)
 
 @router.get("", response_model=list[ScanOut])
 def list_scans(user=Depends(get_current_user), db: Session = Depends(get_db),
+               project_id: UUID | None = None, team_id: UUID | None = None,
                offset: int = Query(0, ge=0), limit: int = Query(50, ge=1, le=100)):
-    return scans_for(db, user).order_by(Scan.timestamp.desc()).offset(offset).limit(limit).all()
+    query = scans_for(db, user)
+    codebases = codebases_for(db, user)
+    if project_id is not None:
+        codebases = codebases.filter(Codebase.project_id == project_id)
+    if team_id is not None:
+        codebases = codebases_in_team(db, codebases, team_id)
+    return query.filter(Scan.codebase_id.in_(codebases.with_entities(Codebase.codebase_id))).order_by(
+        Scan.timestamp.desc(), Scan.scan_id.desc()).offset(offset).limit(limit).all()
 
 @router.get("/{scan_id}", response_model=ScanOut)
 def get_scan(scan_id: UUID, user=Depends(get_current_user), db: Session = Depends(get_db)):

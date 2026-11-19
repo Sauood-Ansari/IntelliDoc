@@ -16,5 +16,4 @@ artifacts/
 logs/
 
 .production/
-dist/
-build/
+.venv-python315-backup/

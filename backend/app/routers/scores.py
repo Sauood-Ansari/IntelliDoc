@@ -49,6 +49,7 @@ def get_programmer_scores(
 
 @router.get("/team/scores", response_model=TeamScoreOut)
 def get_team_scores(
+    team_id: UUID | None = None,
     current_user: User = Depends(allow_team_lead),
     db: Session = Depends(get_db)
 ):
@@ -57,7 +58,10 @@ def get_team_scores(
     Restricted to Team Lead viewing their assigned team.
     """
     # Find the team led by current_user
-    team = db.query(Team).filter(Team.team_lead_id == current_user.user_id).first()
+    query = db.query(Team).filter(Team.team_lead_id == current_user.user_id)
+    if team_id is not None:
+        query = query.filter(Team.team_id == team_id)
+    team = query.order_by(Team.team_id).first()
 
     if not team:
         raise HTTPException(
@@ -77,6 +81,7 @@ def get_team_scores(
 
 @router.get("/project/scores", response_model=ProjectScoreOut)
 def get_project_scores(
+    project_id: UUID | None = None,
     current_user: User = Depends(allow_project_lead),
     db: Session = Depends(get_db)
 ):
@@ -85,7 +90,10 @@ def get_project_scores(
     Restricted to Project Lead viewing project aggregations.
     """
     # Find the project led by current_user
-    project = db.query(Project).filter(Project.project_lead_id == current_user.user_id).first()
+    query = db.query(Project).filter(Project.project_lead_id == current_user.user_id)
+    if project_id is not None:
+        query = query.filter(Project.project_id == project_id)
+    project = query.order_by(Project.project_id).first()
 
     if not project:
         raise HTTPException(
@@ -99,6 +107,7 @@ def get_project_scores(
         project_name=project_data["project_name"],
         average_project_score=project_data["average_project_score"],
         teams_count=project_data["teams_count"],
-        ranked_teams=project_data["ranked_teams"]
+        ranked_teams=project_data["ranked_teams"],
+        ranked_programmers=project_data["ranked_programmers"]
     )
 

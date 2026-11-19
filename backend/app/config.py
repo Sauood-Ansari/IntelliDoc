@@ -14,9 +14,7 @@ class Settings(BaseSettings):
     JWT_EXPIRE_MINUTES: int = 60
     CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
     GROQ_API_KEY: str = ""
-    GROQ_MODEL: str = "llama-3.3-70b-versatile"
-    GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.5-flash"
+    GROQ_MODEL: str = "openai/gpt-oss-120b"
     AI_TIMEOUT: int = 30
     MAX_AI_CONTEXT: int = 24000
     MAX_SOURCE_SIZE: int = 10 * 1024 * 1024

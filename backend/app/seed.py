@@ -4,6 +4,8 @@ from app.models.base import Base
 import app.models
 from app.models.user import User, Team, Project, UserRole
 from app.models.codebase import Codebase
+from app.models import ProjectAccessRequest, TeamMembership, AccessStatus, MembershipStatus
+from datetime import datetime
 from app.services.auth_service import AuthService
 
 
@@ -57,7 +59,8 @@ def seed_database():
         team = Team(
             team_id=uuid.uuid4(),
             team_name="Team Alpha",
-            team_lead_id=team_lead.user_id
+            team_lead_id=team_lead.user_id,
+            project_id=project.project_id
         )
         db.add(team)
         db.flush()
@@ -90,9 +93,17 @@ def seed_database():
             codebase_id=uuid.uuid4(),
             name="IntelliDoc Sample Codebase",
             owner_id=prog1.user_id,
-            project_id=project.project_id
+            project_id=project.project_id,
+            team_id=team.team_id
         )
         db.add(codebase)
+        db.add(ProjectAccessRequest(project_id=project.project_id, team_lead_id=team_lead.user_id,
+            status=AccessStatus.APPROVED, decided_by=project_lead.user_id, decided_at=datetime.utcnow(),
+            decision_note="Local demonstration setup."))
+        for programmer in (prog1, prog2):
+            db.add(TeamMembership(team_id=team.team_id, programmer_id=programmer.user_id,
+                status=MembershipStatus.APPROVED, decided_by=team_lead.user_id, decided_at=datetime.utcnow(),
+                decision_note="Local demonstration setup."))
 
         db.commit()
         from pathlib import Path

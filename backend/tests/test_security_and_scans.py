@@ -17,7 +17,8 @@ def archive(files):
     return buffer.getvalue()
 
 def upload(client, token, codebase, files):
-    return client.post("/api/v1/scans", data={"codebase_id": str(codebase.codebase_id)},
+    return client.post("/api/v1/scans", data={"codebase_id": str(codebase.codebase_id),
+                       "project_id": str(codebase.project_id), "team_id": str(codebase.team_id)},
                        files={"file": ("source.zip", archive(files), "application/zip")}, headers=headers(token))
 
 def test_scan_persists_source_findings_and_errors(client, test_users, programmer_token):
@@ -47,7 +48,8 @@ def test_archive_rejects_unsafe_paths(client, test_users, programmer_token, path
     assert client.get("/api/v1/scans", headers=headers(programmer_token)).json()[0]["status"] == "Failed"
 
 def test_invalid_archive_and_no_python(client, test_users, programmer_token):
-    response = client.post("/api/v1/scans", data={"codebase_id":str(test_users["codebase"].codebase_id)},
+    response = client.post("/api/v1/scans", data={"codebase_id":str(test_users["codebase"].codebase_id),
+                           "project_id":str(test_users["project"].project_id), "team_id":str(test_users["team"].team_id)},
                            files={"file":("bad.zip",b"not a zip")},headers=headers(programmer_token))
     assert response.status_code == 400
     assert upload(client, programmer_token, test_users["codebase"], {"readme.md":"hello"}).status_code == 400
@@ -90,9 +92,11 @@ def test_project_no_fallback(client,db_session,test_users):
     token=AuthService.create_access_token(str(stranger.user_id),stranger.email,stranger.role.value)
     assert client.get("/api/v1/project/scores",headers=headers(token)).status_code==404
 
-def test_public_registration_cannot_escalate(client):
+def test_registration_selects_role_without_existing_team_assignment(client):
     response=client.post("/api/v1/auth/register",json={"name":"Escalation","email":"new@test.com","password":"longpassword","role":"Project Lead"})
-    assert response.status_code==403
+    assert response.status_code==201
+    assert response.json()["role"] == "Project Lead"
+    assert response.json()["team_id"] is None
 
 def test_no_server_directory_scanning(client,test_users,programmer_token):
     response=client.post("/api/v1/scans",data={"codebase_id":str(test_users["codebase"].codebase_id),"directory_path":"C:/"},
